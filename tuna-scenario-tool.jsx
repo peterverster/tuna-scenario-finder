@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Wand2, Loader2, RefreshCw, FileText, Upload, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, FileText, Upload, Check } from 'lucide-react';
 
 // ============================================================
 // CONSTANTS
@@ -425,9 +425,7 @@ export default function TUNAScenarioTool() {
   const [audiencePreset, setAudiencePreset] = useState('mixed');
   const [audienceCustom, setAudienceCustom] = useState('');
   const [documents, setDocuments] = useState([]); // [{id, name, content, included}]
-  // AI scenario generation state
-  const [generatedScenarios, setGeneratedScenarios] = useState({});
-  const [generatingIdx, setGeneratingIdx] = useState(null);
+  // Errors from building the AI prompt download
   const [generationErrors, setGenerationErrors] = useState({});
 
   // Sync matrices when factors / criteria change
@@ -574,7 +572,7 @@ export default function TUNAScenarioTool() {
     setK(4); setAlpha(0.5); setConvergenceFocus(0.6); setCoherenceThreshold(0.4);
     setSeedNames({}); setSeedPhases({});
     setPurpose(''); setAudiencePreset('mixed'); setAudienceCustom(''); setDocuments([]);
-    setGeneratedScenarios({}); setGeneratingIdx(null); setGenerationErrors({});
+    setGenerationErrors({});
     setStep(1);
   };
 
@@ -591,7 +589,7 @@ export default function TUNAScenarioTool() {
       case 7: return <StepStates factorStates={factorStates} setFactorStates={setFactorStates} topFactors={topFactors} stateLabelOverrides={stateLabelOverrides} setStateLabelOverrides={setStateLabelOverrides} />;
       case 8: return <StepCoupling topFactors={topFactors} couplingMatrix={couplingMatrix} setCouplingMatrix={setCouplingMatrix} triggerMatrix={triggerMatrix} setTriggerMatrix={setTriggerMatrix} />;
       case 9: return <StepContext purpose={purpose} setPurpose={setPurpose} audiencePreset={audiencePreset} setAudiencePreset={setAudiencePreset} audienceCustom={audienceCustom} setAudienceCustom={setAudienceCustom} documents={documents} setDocuments={setDocuments} />;
-      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generatedScenarios={generatedScenarios} setGeneratedScenarios={setGeneratedScenarios} generatingIdx={generatingIdx} setGeneratingIdx={setGeneratingIdx} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
+      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
       default: return null;
     }
   };
@@ -1676,7 +1674,7 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
 // STEP 10 — SEEDS WITH CONVERGENCE & ARRIVAL
 // ============================================================
 
-function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generatedScenarios, setGeneratedScenarios, generatingIdx, setGeneratingIdx, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
+function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
 
   const stateLabel = (factorId, stateIdx) =>
     stateLabelOverrides[factorId]?.[stateIdx] || factorStates[stateIdx]?.label || '';
@@ -1789,56 +1787,29 @@ Write the scenario as a single JSON object with the following keys, returning ON
 Return ONLY the JSON. No backticks, no explanation, no markdown.`;
   };
 
-  const generateScenario = async (idx) => {
-    setGeneratingIdx(idx);
-    setGenerationErrors({ ...generationErrors, [idx]: null });
-
+  const generateScenario = (idx) => {
     try {
       const prompt = buildPrompt(idx);
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
+      if (!prompt) return;
 
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}`);
-      }
+      const slug = (seedNames[idx] || `seed-${idx + 1}`)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
+        .slice(0, 60) || `seed-${idx + 1}`;
 
-      const data = await response.json();
-      const fullText = data.content
-        .map(b => (b.type === 'text' && b.text) ? b.text : '')
-        .filter(Boolean)
-        .join('\n');
-
-      // Strip any markdown fences and parse
-      const cleaned = fullText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
-      let parsed;
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch (parseErr) {
-        // Try extracting the first JSON object from the text
-        const match = cleaned.match(/\{[\s\S]*\}/);
-        if (match) {
-          parsed = JSON.parse(match[0]);
-        } else {
-          throw new Error('Could not parse scenario from response');
-        }
-      }
-
-      setGeneratedScenarios({ ...generatedScenarios, [idx]: parsed });
-      // If user hasn't named the seed yet, populate from the AI name
-      if (!seedNames[idx] && parsed.name) {
-        setSeedNames({ ...seedNames, [idx]: parsed.name });
-      }
+      const blob = new Blob([prompt], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tuna-prompt-${slug}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setGenerationErrors({ ...generationErrors, [idx]: null });
     } catch (err) {
-      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Generation failed' });
-    } finally {
-      setGeneratingIdx(null);
+      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Could not build prompt' });
     }
   };
 
@@ -1982,12 +1953,9 @@ Return ONLY the JSON. No backticks, no explanation, no markdown.`;
                 })}
               </div>
 
-              {/* AI Generation Panel */}
+              {/* AI Prompt Download */}
               <AIScenarioPanel
                 seedIdx={idx}
-                color={color}
-                generatedScenarios={generatedScenarios}
-                generatingIdx={generatingIdx}
                 generationErrors={generationErrors}
                 onGenerate={() => generateScenario(idx)}
               />
@@ -2008,105 +1976,25 @@ Return ONLY the JSON. No backticks, no explanation, no markdown.`;
   );
 }
 
-function AIScenarioPanel({ seedIdx, color, generatedScenarios, generatingIdx, generationErrors, onGenerate }) {
-  const scenario = generatedScenarios[seedIdx];
-  const isGenerating = generatingIdx === seedIdx;
+function AIScenarioPanel({ seedIdx, generationErrors, onGenerate }) {
   const error = generationErrors[seedIdx];
-  const isOtherGenerating = generatingIdx !== null && generatingIdx !== seedIdx;
 
-  if (isGenerating) {
-    return (
-      <div className="px-6 py-5 border-t border-slate-800 bg-slate-950/50">
-        <div className="flex items-center gap-3 text-amber-300">
-          <Loader2 size={16} className="animate-spin" />
-          <div className="text-sm font-mono">Generating scenario from seed parameters…</div>
-        </div>
-        <div className="text-xs text-slate-600 mt-2 ml-7">Sending factors, weights, criticalities, coupling, and arrival timing to the model.</div>
-      </div>
-    );
-  }
-
-  if (!scenario) {
-    return (
-      <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
-        <div className="text-xs text-slate-500">
-          {error ? (
-            <span className="text-rose-400">Generation failed: {error}</span>
-          ) : (
-            <span>No narrative yet. The seed parameters above can be expanded into a full scenario.</span>
-          )}
-        </div>
-        <button
-          onClick={onGenerate}
-          disabled={isOtherGenerating}
-          className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition
-            ${isOtherGenerating
-              ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-              : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40'
-            }`}
-        >
-          <Wand2 size={14} />
-          {error ? 'Try again' : 'Generate with AI'}
-        </button>
-      </div>
-    );
-  }
-
-  // Scenario rendered
   return (
-    <div className="border-t border-slate-800 bg-slate-950/40">
-      <div className="px-6 py-5 space-y-5">
-        <div className="flex items-baseline justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color }}>AI-generated scenario</div>
-            <div className="font-display text-2xl text-slate-50 leading-tight">{scenario.name}</div>
-            {scenario.tagline && (
-              <div className="text-sm text-slate-400 italic mt-1">{scenario.tagline}</div>
-            )}
-          </div>
-          <button
-            onClick={onGenerate}
-            disabled={isOtherGenerating}
-            className="flex items-center gap-1.5 text-xs font-mono text-slate-500 hover:text-amber-300 transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={11} /> regenerate
-          </button>
-        </div>
-
-        {scenario.narrative && (
-          <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-            {scenario.narrative}
-          </div>
-        )}
-
-        {scenario.tension && (
-          <div className="border-l-2 pl-4 py-1" style={{ borderColor: color }}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Structural tension</div>
-            <div className="text-sm text-slate-300 leading-relaxed">{scenario.tension}</div>
-          </div>
-        )}
-
-        {Array.isArray(scenario.signals) && scenario.signals.length > 0 && (
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">Observable signals</div>
-            <ul className="space-y-1.5">
-              {scenario.signals.map((sig, i) => (
-                <li key={i} className="text-sm text-slate-300 flex gap-2">
-                  <span className="text-slate-600 font-mono text-xs flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                  <span>{sig}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {scenario.implications && (
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Strategic implications</div>
-            <div className="text-sm text-slate-300 leading-relaxed">{scenario.implications}</div>
-          </div>
+    <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+      <div className="text-xs text-slate-500">
+        {error ? (
+          <span className="text-rose-400">Could not build prompt: {error}</span>
+        ) : (
+          <span>Download the prompt as a text file, then paste it into your preferred LLM.</span>
         )}
       </div>
+      <button
+        onClick={onGenerate}
+        className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
+      >
+        <FileText size={14} />
+        Download AI prompt
+      </button>
     </div>
   );
 }
