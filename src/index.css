@@ -27,25 +27,26 @@
   --signal-press: 244 122 73;
 }
 
-/* Light theme — brand Light Grey ground, white raised cards, darker accents
-   so colour readouts (CR badges, signal pills) keep their semantic punch. */
+/* Light theme — paper-warm ground per Brand-GuidelinesV4 + landing design.
+   White raised cards, warm off-white nested, deeper Fire on light, signals
+   darkened so CR badges and reinforcing/damping cues read against paper. */
 [data-theme="light"] {
-  --surface-base: 240 240 240;     /* brand Light Grey */
+  --surface-base: 250 250 248;     /* paper — warm off-white */
   --surface-raised: 255 255 255;   /* pure white cards */
-  --surface-muted: 247 247 248;    /* near-white nested */
-  --surface-border: 215 215 220;   /* hairlines */
+  --surface-muted: 243 242 238;    /* paper-2 — sectional shifts */
+  --surface-border: 216 214 207;   /* line — hairlines / borders */
 
-  --ink-primary: 26 26 32;         /* near-black */
-  --ink-secondary: 92 92 104;
-  --ink-muted: 130 130 140;
-  --ink-inverse: 240 240 240;      /* light text on Fire buttons */
+  --ink-primary: 26 26 32;         /* near-black, brand-aligned */
+  --ink-secondary: 74 74 85;       /* ink-2 from design */
+  --ink-muted: 130 130 140;        /* ink-3 from design */
+  --ink-inverse: 250 250 248;      /* paper text on Fire buttons */
 
-  --brand-fire: 230 50 0;          /* slightly deeper Fire for legibility on light */
+  --brand-fire: 255 58 5;          /* full Fire — pure brand Fire Orange */
   --brand-slate: 46 46 54;
   --brand-dark: 80 80 90;
   --brand-light: 240 240 240;
 
-  /* Signals adjusted for ≥4.5:1 contrast on white. */
+  /* Signals adjusted for ≥4.5:1 contrast on paper. */
   --signal-thought: 175 130 0;     /* darker amber */
   --signal-advisory: 38 110 75;    /* darker green */
   --signal-speaking: 91 80 174;    /* darker purple */

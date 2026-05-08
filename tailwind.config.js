@@ -40,6 +40,17 @@ export default {
         body: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['"Noto Sans Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
+      keyframes: {
+        'tuna-pulse': {
+          '0%':   { left: '-60px', opacity: '0' },
+          '10%':  { opacity: '1' },
+          '90%':  { opacity: '1' },
+          '100%': { left: '100%', opacity: '0' },
+        },
+      },
+      animation: {
+        'tuna-pulse': 'tuna-pulse 4.5s linear infinite',
+      },
     },
   },
   plugins: [],

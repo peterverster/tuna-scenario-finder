@@ -1532,114 +1532,140 @@ export default function TUNAScenarioTool() {
       <style>{fontStack}</style>
 
       <div className="border-b border-surface-border bg-surface-raised/50 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-5">
-          <div className={`flex items-center justify-between ${step === 0 ? '' : 'mb-4'}`}>
-            <button
-              onClick={() => setStep(0)}
-              className="text-left group"
-              title="Return to introduction"
-            >
-              <h1 className="font-display text-2xl text-ink-primary leading-tight group-hover:text-brand-fire transition">TUNA Scenario Finder</h1>
-              <p className="text-xs font-mono text-ink-muted mt-0.5">
-                <span className="text-ink-secondary font-semibold">T</span>urbulent · <span className="text-ink-secondary font-semibold">U</span>npredictable · <span className="text-ink-secondary font-semibold">N</span>ovel · <span className="text-ink-secondary font-semibold">A</span>mbiguous
-              </p>
-            </button>
-            <div className="flex items-center gap-2">
-              {step > 0 && (
-                <button
-                  onClick={() => setStep(0)}
-                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
-                >
-                  <BookOpen size={12} /> About
-                </button>
-              )}
+        {step === 0 ? (
+          /* === Landing header — quiet wordmark + nav (per design) === */
+          <div className="max-w-[1240px] mx-auto px-6 lg:px-8 py-[18px] flex items-center justify-between gap-6">
+            <div className="flex items-baseline gap-3">
+              <span className="font-semibold text-[16px] tracking-[-0.01em] text-ink-primary">Peter Verster</span>
+              <span className="inline-block w-[22px] h-px bg-ink-muted mx-1" aria-hidden="true" />
+              <span className="font-mono text-[11px] tracking-[0.04em] text-ink-muted">TUNA Scenario Finder</span>
+            </div>
+            <nav className="flex items-center gap-7">
+              <a href="#problem" className="hidden md:inline text-[13px] font-medium text-ink-secondary hover:text-ink-primary transition">The problem</a>
+              <a href="#method" className="hidden md:inline text-[13px] font-medium text-ink-secondary hover:text-ink-primary transition">Method</a>
               <button
                 onClick={toggleTheme}
-                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                className="text-ink-secondary hover:text-ink-primary transition p-1.5"
                 title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
                 aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               >
-                {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
               <button
-                onClick={handleImportClick}
-                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
-                title="Import a previously exported scenario JSON"
+                onClick={() => setStep(1)}
+                className="text-[13px] font-medium text-ink-primary px-3.5 py-2 border border-surface-border hover:border-ink-primary rounded-full bg-surface-raised transition"
               >
-                <Upload size={12} /> Import
+                Begin →
               </button>
+            </nav>
+          </div>
+        ) : (
+          /* === Wizard header — full chrome (Import/Export/Share/Reset etc.) === */
+          <div className="max-w-6xl mx-auto px-6 py-5">
+            <div className="flex items-center justify-between mb-4">
               <button
-                onClick={handleExport}
-                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
-                title="Export this scenario as JSON"
+                onClick={() => setStep(0)}
+                className="text-left group"
+                title="Return to introduction"
               >
-                <Download size={12} /> Export
+                <h1 className="font-display text-2xl text-ink-primary leading-tight group-hover:text-brand-fire transition">TUNA Scenario Finder</h1>
+                <p className="text-xs font-mono text-ink-muted mt-0.5">
+                  <span className="text-ink-secondary font-semibold">T</span>urbulent · <span className="text-ink-secondary font-semibold">U</span>npredictable · <span className="text-ink-secondary font-semibold">N</span>ovel · <span className="text-ink-secondary font-semibold">A</span>mbiguous
+                </p>
               </button>
-              <button
-                onClick={handleShareOpen}
-                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
-                title="Get a shareable URL for this scenario"
-              >
-                <Share2 size={12} /> Share
-              </button>
-              {step > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setStep(0)}
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
+                >
+                  <BookOpen size={12} /> About
+                </button>
+                <button
+                  onClick={toggleTheme}
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
+                  title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                  aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                >
+                  {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+                </button>
+                <button
+                  onClick={handleImportClick}
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
+                  title="Import a previously exported scenario JSON"
+                >
+                  <Upload size={12} /> Import
+                </button>
+                <button
+                  onClick={handleExport}
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
+                  title="Export this scenario as JSON"
+                >
+                  <Download size={12} /> Export
+                </button>
+                <button
+                  onClick={handleShareOpen}
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
+                  title="Get a shareable URL for this scenario"
+                >
+                  <Share2 size={12} /> Share
+                </button>
                 <button
                   onClick={handleReset}
-                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border transition"
                 >
                   <RotateCcw size={12} /> Reset
                 </button>
-              )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 overflow-x-auto">
+              {STEPS.map((s, idx) => (
+                <React.Fragment key={s.num}>
+                  <button
+                    onClick={() => s.num < step && setStep(s.num)}
+                    disabled={s.num > step}
+                    className={`
+                      flex-1 py-1.5 text-xs font-mono transition relative whitespace-nowrap
+                      ${s.num === step ? 'text-brand-fire' : s.num < step ? 'text-ink-secondary hover:text-ink-primary cursor-pointer' : 'text-ink-muted'}
+                    `}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span className={`
+                        w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0
+                        ${s.num === step ? 'bg-brand-fire text-ink-inverse' : s.num < step ? 'bg-surface-border text-ink-secondary' : 'bg-surface-border text-ink-muted'}
+                      `}>
+                        {s.num < step ? '✓' : s.num}
+                      </span>
+                      <span className="hidden lg:inline">{s.label}</span>
+                    </div>
+                  </button>
+                  {idx < STEPS.length - 1 && <div className="w-2 h-px bg-surface-border" />}
+                </React.Fragment>
+              ))}
             </div>
           </div>
-
-          {step > 0 && (
-          <div className="flex items-center gap-1 overflow-x-auto">
-            {STEPS.map((s, idx) => (
-              <React.Fragment key={s.num}>
-                <button
-                  onClick={() => s.num < step && setStep(s.num)}
-                  disabled={s.num > step}
-                  className={`
-                    flex-1 py-1.5 text-xs font-mono transition relative whitespace-nowrap
-                    ${s.num === step ? 'text-brand-fire' : s.num < step ? 'text-ink-secondary hover:text-ink-secondary cursor-pointer' : 'text-ink-muted'}
-                  `}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className={`
-                      w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0
-                      ${s.num === step ? 'bg-brand-fire text-surface-base' : s.num < step ? 'bg-surface-border text-ink-secondary' : 'bg-surface-border text-ink-muted'}
-                    `}>
-                      {s.num < step ? '✓' : s.num}
-                    </span>
-                    <span className="hidden lg:inline">{s.label}</span>
-                  </div>
-                </button>
-                {idx < STEPS.length - 1 && <div className="w-2 h-px bg-surface-border" />}
-              </React.Fragment>
-            ))}
-          </div>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-10 pb-32">
+      <div className={step === 0 ? 'pb-24' : 'max-w-6xl mx-auto px-6 py-10 pb-32'}>
         {hydratingFromUrl && (
-          <div className="text-sm font-mono text-ink-muted">Loading scenario…</div>
+          <div className="px-6 py-4 text-sm font-mono text-ink-muted">Loading scenario…</div>
         )}
         {!hydratingFromUrl && step === 0 && loadError && (
-          <div className="mb-8 max-w-3xl border border-signal-press/40 bg-signal-press/10 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle size={18} className="text-signal-press flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-ink-primary">
-              <div className="font-medium mb-1">
-                {loadError.kind === 'not-found' && `Scenario ${loadError.uuid.slice(0, 8)} not found`}
-                {loadError.kind === 'network' && `Couldn't load scenario ${loadError.uuid.slice(0, 8)}`}
-                {loadError.kind === 'format' && `Scenario ${loadError.uuid.slice(0, 8)} is in an unsupported format`}
-              </div>
-              <div className="text-ink-secondary text-xs">
-                {loadError.kind === 'not-found' && 'It may have been removed, or the publisher hasn\'t pushed it yet. The default fixture has been loaded as a fallback.'}
-                {loadError.kind === 'network' && 'Check your connection and refresh. The default fixture has been loaded as a fallback.'}
-                {loadError.kind === 'format' && 'It may have been created by a different version of the tool. The default fixture has been loaded as a fallback.'}
+          <div className="max-w-[1100px] mx-auto px-6 lg:px-8 pt-6 -mb-2">
+            <div className="border border-signal-press/40 bg-signal-press/10 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle size={18} className="text-signal-press flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-ink-primary">
+                <div className="font-medium mb-1">
+                  {loadError.kind === 'not-found' && `Scenario ${loadError.uuid.slice(0, 8)} not found`}
+                  {loadError.kind === 'network' && `Couldn't load scenario ${loadError.uuid.slice(0, 8)}`}
+                  {loadError.kind === 'format' && `Scenario ${loadError.uuid.slice(0, 8)} is in an unsupported format`}
+                </div>
+                <div className="text-ink-secondary text-xs">
+                  {loadError.kind === 'not-found' && 'It may have been removed, or the publisher hasn\'t pushed it yet. The default fixture has been loaded as a fallback.'}
+                  {loadError.kind === 'network' && 'Check your connection and refresh. The default fixture has been loaded as a fallback.'}
+                  {loadError.kind === 'format' && 'It may have been created by a different version of the tool. The default fixture has been loaded as a fallback.'}
+                </div>
               </div>
             </div>
           </div>
@@ -1647,27 +1673,29 @@ export default function TUNAScenarioTool() {
         {!hydratingFromUrl && renderStep()}
       </div>
 
-      <div className="border-t border-surface-border bg-surface-raised/50 backdrop-blur fixed bottom-0 left-0 right-0">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button
-            onClick={() => setStep(s => Math.max(0, s - 1))}
-            disabled={step === 0}
-            className="flex items-center gap-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-30 disabled:cursor-not-allowed transition"
-          >
-            <ChevronLeft size={16} /> Back
-          </button>
-          <div className="text-xs font-mono text-ink-muted">
-            {step === 0 ? 'Introduction' : `Step ${step} / ${STEPS.length}`}
+      {step > 0 && (
+        <div className="border-t border-surface-border bg-surface-raised/50 backdrop-blur fixed bottom-0 left-0 right-0">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <button
+              onClick={() => setStep(s => Math.max(0, s - 1))}
+              disabled={step === 0}
+              className="flex items-center gap-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              <ChevronLeft size={16} /> Back
+            </button>
+            <div className="text-xs font-mono text-ink-muted">
+              {`Step ${step} / ${STEPS.length}`}
+            </div>
+            <button
+              onClick={() => setStep(s => Math.min(STEPS.length, s + 1))}
+              disabled={step === STEPS.length || !canProceed[step]}
+              className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:brightness-110 text-ink-inverse px-5 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
+            >
+              {step === STEPS.length ? 'Done' : 'Continue'} <ChevronRight size={16} />
+            </button>
           </div>
-          <button
-            onClick={() => setStep(s => Math.min(STEPS.length, s + 1))}
-            disabled={step === STEPS.length || !canProceed[step]}
-            className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-5 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
-          >
-            {step === 0 ? 'Begin' : step === STEPS.length ? 'Done' : 'Continue'} <ChevronRight size={16} />
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Share modal */}
       <ShareModal
@@ -1723,260 +1751,354 @@ export default function TUNAScenarioTool() {
 // STEP 0 — INTRODUCTION / LANDING
 // ============================================================
 
-function StepIntro({ onBegin }) {
-  const methods = [
-    {
-      icon: Target,
-      name: 'Analytic Hierarchy Process',
-      attribution: 'Saaty, 1977',
-      blurb: 'Pairwise comparisons on a 1–9 ratio scale derive defensible priorities for criteria and factors. The Consistency Ratio surfaces internal contradictions before they propagate.',
-    },
-    {
-      icon: Layers,
-      name: 'Morphological Analysis',
-      attribution: 'Zwicky 1969 · Ritchey 2011',
-      blurb: 'Treats each factor as a dimension with a small set of discrete states and exhaustively enumerates the configuration space. K^N seed candidates, every one structurally distinct.',
-    },
-    {
-      icon: Activity,
-      name: 'Signed Cross-Consistency',
-      attribution: 'aggregate-coupling approximation',
-      blurb: 'Each factor pair gets a signed coupling strength: reinforcing (factors trend together) or damping (factors oppose). Coherence is computed at the seed level, filtering incoherent configurations.',
-    },
-    {
-      icon: Clock,
-      name: 'Arrows of Time',
-      attribution: 'Oxford OSPA',
-      blurb: 'Per-factor velocity, proximity, and path-dependency anchor seeds in time. Convergence-potential scoring identifies seeds at the structural moment of bifurcation, not arbitrary spatial corners.',
-    },
-  ];
+const TUNA_LETTERS = [
+  { char: 'T', word: 'turbulent' },
+  { char: 'U', word: 'unpredictable' },
+  { char: 'N', word: 'novel' },
+  { char: 'A', word: 'ambiguous' },
+];
 
-  const exclusions = [
-    {
-      title: 'Not a forecasting tool.',
-      body: 'No probabilities are estimated. Scenarios are imaginative explorations of plausible futures under irreducible uncertainty, not predictions.',
-    },
-    {
-      title: 'Not a finished scenario.',
-      body: 'The output is a small set of structured seeds. Narrative writing — the story, the signals, the strategic implications — remains with the human strategist.',
-    },
-    {
-      title: 'Not a substitute for judgement.',
-      body: 'Every weight, every coupling, every state assignment comes from the strategist. The tool enforces structure on those judgements; it does not replace them.',
-    },
-    {
-      title: 'Not a strategy wind-tunnel.',
-      body: 'Testing organisational strategies against the seed set (OSPA’s next step) is out of scope here. This tool stops at seed generation.',
-    },
-    {
-      title: 'Not a collaboration platform.',
-      body: 'No multi-user co-editing, no comments, no review workflow. One strategist, one project, one browser session.',
-    },
-    {
-      title: 'Not a server.',
-      body: 'All computation runs client-side. Nothing is transmitted; persistence is browser-local; exports are downloadable Blobs you control.',
-    },
-    {
-      title: 'Not an LLM narrative generator.',
-      body: 'The pipeline is deterministic mathematics from start to finish. AI-assisted narrative drafting is a separate, downstream activity.',
-    },
-    {
-      title: 'Not a 2×2 driving-forces matrix.',
-      body: 'It is a structural alternative to the GBN method. If you came looking for two axes and four quadrants, this is the wrong tool.',
-    },
-  ];
+const LANDING_PROBLEMS = [
+  {
+    num: '01',
+    accent: 'signal-press',
+    title: 'Two axes flatten reality.',
+    body: 'Picking two drivers forces you to discard everything else. Real futures are shaped by ten or more entangled forces — the 2×2 collapses them into a cartoon.',
+    tag: 'Reductive structure',
+  },
+  {
+    num: '02',
+    accent: 'signal-thought',
+    title: "Quadrants don't have to be coherent.",
+    body: 'A 2×2 cell is just an intersection. Nothing in the method guarantees the world it describes is internally consistent — you get four boxes, not four worlds.',
+    tag: 'Coherence not enforced',
+  },
+  {
+    num: '03',
+    accent: 'signal-advisory',
+    title: 'No anchor in time.',
+    body: "The four scenarios float. There's no mechanism to pin them to a horizon, sequence the events that get you there, or stress-test how they unfold over decades.",
+    tag: 'Temporally untethered',
+  },
+];
+
+const LANDING_STEPS = [
+  { num: '01', title: 'Frame the focal question', hint: 'scope · horizon' },
+  { num: '02', title: 'Identify driving forces', hint: '10–15 drivers' },
+  { num: '03', title: 'Specify driver states', hint: '3–5 each' },
+  { num: '04', title: 'Build the morphological field', hint: 'cross-impact', active: true },
+  { num: '05', title: 'Score consistency pairs', hint: '−2 → +2' },
+  { num: '06', title: 'Sample candidate configurations', hint: 'algorithmic' },
+  { num: '07', title: 'Filter for distinctness', hint: 'Hamming d ≥ k' },
+  { num: '08', title: 'Test for coherence', hint: 'internal logic' },
+  { num: '09', title: 'Anchor to a horizon', hint: 'timeline' },
+  { num: '10', title: 'Export seeds for narrative', hint: 'JSON · markdown' },
+];
+
+const LANDING_AUDIENCE = ['Foresight teams', 'Strategy advisors', 'Boards & planning', 'Policy & risk', 'Researchers'];
+
+// Morphological field preview — 5 drivers × 5 states with one cell active per row.
+const MORPH_PREVIEW = [
+  { label: 'Geopolitics',     cells: ['dim', 'on',   '',   'dim', ''   ] },
+  { label: 'AI capability',   cells: [''  , 'dim',  'fire','',   'dim' ] },
+  { label: 'Energy mix',      cells: ['dim','on',   '',   '',    'dim' ] },
+  { label: 'Capital flows',   cells: ['',   '',     'on', 'dim', ''    ] },
+  { label: 'Social trust',    cells: ['dim','',     '',   'on',  'dim' ] },
+];
+
+function MorphCell({ kind }) {
+  const base = 'h-[30px] rounded transition-colors';
+  if (kind === 'on')    return <div className={`${base} bg-ink-primary`} />;
+  if (kind === 'fire')  return <div className={`${base} bg-brand-fire`} />;
+  if (kind === 'dim')   return <div className={`${base} bg-surface-muted border border-surface-border/60`} />;
+  return <div className={`${base} bg-surface-base/60 border border-surface-border/40`} />;
+}
+
+function MethodFigureSVG() {
+  return (
+    <svg viewBox="0 0 360 280" width="100%" height="280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="mfFade" x1="0" x2="1">
+          <stop offset="0" stopColor="rgb(var(--brand-fire))" stopOpacity="0" />
+          <stop offset="0.5" stopColor="rgb(var(--brand-fire))" stopOpacity="0.85" />
+          <stop offset="1" stopColor="rgb(var(--brand-fire))" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <g stroke="rgb(var(--surface-border))" strokeWidth="1">
+        {[40, 80, 120, 160, 200, 240].map(y => <line key={y} x1="0" y1={y} x2="360" y2={y} />)}
+      </g>
+      <g fontFamily="Noto Sans Mono, monospace" fontSize="9.5" className="fill-ink-muted" letterSpacing="0.04em">
+        <text x="0" y="34">D1 · GEOPOLITICS</text>
+        <text x="0" y="74">D2 · AI CAPABILITY</text>
+        <text x="0" y="114">D3 · ENERGY MIX</text>
+        <text x="0" y="154">D4 · CAPITAL FLOWS</text>
+        <text x="0" y="194">D5 · SOCIAL TRUST</text>
+        <text x="0" y="234">D6 · DEMOGRAPHICS</text>
+      </g>
+      {[
+        { y: 22, fills: [0, 1, 0, 0, 0] },
+        { y: 62, fills: [0, 0, 2, 0, 0] }, // 2 = fire
+        { y: 102, fills: [0, 1, 0, 0, 0] },
+        { y: 142, fills: [0, 0, 1, 0, 0] },
+        { y: 182, fills: [0, 0, 0, 1, 0] },
+        { y: 222, fills: [0, 1, 0, 0, 0] },
+      ].map((row, i) =>
+        row.fills.map((kind, j) => {
+          const x = 200 + j * 32;
+          const fill = kind === 1 ? 'rgb(var(--ink-primary))' : kind === 2 ? 'rgb(var(--brand-fire))' : 'rgb(var(--surface-muted))';
+          return <rect key={`${i}-${j}`} x={x} y={row.y} width="28" height="22" rx="3" fill={fill} />;
+        })
+      )}
+      <polyline points="246,33 278,73 246,113 278,153 310,193 246,233" fill="none" stroke="url(#mfFade)" strokeWidth="1.5" strokeDasharray="3 3" />
+    </svg>
+  );
+}
+
+function StepIntro({ onBegin }) {
+  const accentToClass = {
+    'signal-press':    { dot: 'bg-signal-press',    tag: 'text-signal-press' },
+    'signal-thought':  { dot: 'bg-signal-thought',  tag: 'text-signal-thought' },
+    'signal-advisory': { dot: 'bg-signal-advisory', tag: 'text-signal-advisory' },
+  };
 
   return (
-    <div className="space-y-16 max-w-5xl mx-auto">
-      {/* HERO */}
-      <section className="space-y-6 pt-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-border bg-surface-raised/50">
-          <Compass size={12} className="text-brand-fire" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-ink-secondary">Strategic scenario generation under deep uncertainty</span>
-        </div>
-        <h1 className="font-display text-5xl md:text-6xl text-ink-primary leading-[1.05] tracking-tight">
-          Scenario seeds for <span className="text-brand-fire">TUNA</span> conditions —
-          <span className="text-ink-secondary"> structurally distinct, internally coherent, anchored in time.</span>
-        </h1>
-        <p className="text-lg text-ink-secondary leading-relaxed max-w-3xl">
-          A morphological scenario seed generator for futures characterised by
-          <span className="text-ink-primary"> Turbulence, Unpredictability, Novelty, and Ambiguity</span>.
-          Built to address the structural weaknesses of the standard 2×2 driving-forces method while preserving its strengths: imagination, defensibility, and stakeholder traction.
-        </p>
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <button
-            onClick={onBegin}
-            className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-5 py-2.5 rounded transition"
-          >
-            Begin <ArrowRight size={16} />
-          </button>
-          <span className="text-xs font-mono text-ink-muted">10 steps · ~30 minutes · entirely client-side</span>
-        </div>
-      </section>
-
-      {/* PROBLEM */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-brand-fire/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-brand-fire">The problem</span>
-        </div>
-        <h2 className="font-display text-3xl text-ink-primary leading-tight">
-          The dominant scenario method has three structural weaknesses.
-        </h2>
-        <p className="text-ink-secondary leading-relaxed">
-          The Global Business Network (GBN) intuitive-logics method, codified by Schwartz, Wack, and Ogilvy in the 1980s, has been the consensus practice in corporate strategy for forty years. It produces four scenarios by selecting two high-impact, high-uncertainty driving forces as axes of a 2×2 matrix. The method works — in the sense that it produces scenarios strategists and boards can engage with — but experienced practitioners work around three weaknesses informally.
-        </p>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-signal-press">Weakness 1</div>
-            <div className="font-display text-lg text-ink-primary">Causal entanglement</div>
-            <p className="text-sm text-ink-secondary leading-relaxed">
-              Two driving forces can both score high on impact and uncertainty but be causally linked, so the four quadrants of the 2×2 collapse into two effective futures — or one.
-            </p>
-          </div>
-          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-signal-press">Weakness 2</div>
-            <div className="font-display text-lg text-ink-primary">Static time</div>
-            <p className="text-sm text-ink-secondary leading-relaxed">
-              Scenarios become spatial configurations rather than transitional moments. In TUNA conditions — complex adaptive systems that bifurcate rather than evolve smoothly — the moments of structural transition are precisely what should be illuminated.
-            </p>
-          </div>
-          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-signal-press">Weakness 3</div>
-            <div className="font-display text-lg text-ink-primary">Opaque reasoning</div>
-            <p className="text-sm text-ink-secondary leading-relaxed">
-              “Why these four scenarios rather than four others?” The conventional answer is “this was our judgement.” Increasingly insufficient for sophisticated audiences expecting reasoning transparency.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* METHODOLOGY */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-signal-advisory/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-advisory">The methodology</span>
-        </div>
-        <h2 className="font-display text-3xl text-ink-primary leading-tight">
-          Four traditions integrated into one deterministic pipeline.
-        </h2>
-        <p className="text-ink-secondary leading-relaxed">
-          Each step is named, scoped, and tested. The output is a small set of seeds — typically four — that are mathematically distinct, internally coherent, anchored in time, and defended by an auditable chain of judgement.
-        </p>
-        <div className="grid md:grid-cols-2 gap-4">
-          {methods.map((m, i) => {
-            const Icon = m.icon;
-            return (
-              <div key={i} className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded bg-brand-fire/10 border border-brand-fire/30 flex items-center justify-center flex-shrink-0">
-                    <Icon size={16} className="text-brand-fire" />
-                  </div>
-                  <div>
-                    <div className="font-display text-lg text-ink-primary leading-tight">{m.name}</div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-ink-muted mt-0.5">{m.attribution}</div>
-                  </div>
-                </div>
-                <p className="text-sm text-ink-secondary leading-relaxed">{m.blurb}</p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* WHY IT MATTERS */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-brand-fire/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-brand-fire">Why it matters</span>
-        </div>
-        <h2 className="font-display text-3xl text-ink-primary leading-tight">
-          Bifurcation, not extrapolation.
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6 text-ink-secondary leading-relaxed">
-          <div className="space-y-4">
-            <p>
-              Emery and Trist (1965) classified organisational environments into four types based on causal interconnection. The fourth — <span className="text-ink-primary">turbulent fields</span> — is dynamic, highly interconnected, with changes amplifying through the system in unpredictable ways. Frank Knight (1921) distinguished risk (probabilities knowable, calculable, insurable) from uncertainty (probabilities unknowable, irreducible to mathematics).
-            </p>
-            <p>
-              The intersection of turbulent-field dynamics with Knightian uncertainty is what Oxford’s Saïd Business School calls <span className="text-brand-fire font-medium">TUNA conditions</span> — the design target for this tool.
-            </p>
-          </div>
-          <div className="space-y-4">
-            <p>
-              W. Brian Arthur’s complexity economics provides the structural model. Technologies recombine at exponential rates, producing emergent properties that cannot be predicted from component analysis. Positive feedback drives runaway dynamics rather than equilibrium. Systems accumulate tension until they hit <span className="text-signal-advisory font-medium">bifurcation points</span> and snap into qualitatively new configurations.
-            </p>
-            <p>
-              The strategist’s task is not to predict which bifurcation will happen but to <span className="text-ink-primary">imagine plausible post-bifurcation realities and prepare for them</span>. The convergence-potential metric identifies seeds at exactly those structural transitions.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* WORKFLOW */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-signal-advisory/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-advisory">The workflow</span>
-        </div>
-        <h2 className="font-display text-3xl text-ink-primary leading-tight">
-          Ten steps from candidate factors to named seeds.
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
-          {STEPS.map((s, idx) => (
-            <div key={s.num} className="border border-surface-border bg-surface-raised/40 rounded p-3 flex items-center gap-3">
-              <span className="w-6 h-6 rounded-full bg-surface-border text-ink-secondary text-[10px] font-mono flex items-center justify-center flex-shrink-0">
-                {s.num}
+    <div>
+      {/* ===================== HERO ===================== */}
+      <section className="px-6 lg:px-8 pt-16 lg:pt-22 pb-20 lg:pb-24">
+        <div className="max-w-[1240px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] gap-14 lg:gap-20 items-start">
+          <div>
+            <div className="inline-flex items-center gap-2.5 px-3 py-1.5 pl-2.5 rounded-full bg-surface-raised border border-surface-border/70">
+              <span className="relative inline-block w-1.5 h-1.5 rounded-full bg-brand-fire">
+                <span className="absolute -inset-1 rounded-full bg-brand-fire/15" />
               </span>
-              <span className="text-sm text-ink-secondary truncate">{s.label}</span>
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-secondary">
+                Strategic scenario generation under deep uncertainty
+              </span>
             </div>
-          ))}
-        </div>
-        <p className="text-sm text-ink-muted leading-relaxed">
-          The first five steps weight criteria and factors via AHP. Steps 6–8 set the temporal arrows, state palette, and signed coupling. Step 9 captures the strategic context. Step 10 generates, filters, scores, and selects the seed set — with arrival timeline and parallel-coordinates visualisation.
-        </p>
-      </section>
 
-      {/* WHAT IT IS NOT */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-signal-press/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-press">What this tool is not</span>
-        </div>
-        <h2 className="font-display text-3xl text-ink-primary leading-tight">
-          Knowing the boundary is part of the contract.
-        </h2>
-        <p className="text-ink-secondary leading-relaxed max-w-3xl">
-          A clear scope is what keeps a method useful. The following are deliberately excluded — some belong to adjacent activities, some are out of scope for v1, some are explicitly someone else’s job.
-        </p>
-        <div className="grid md:grid-cols-2 gap-3">
-          {exclusions.map((x, i) => (
-            <div key={i} className="border border-surface-border bg-surface-raised/40 rounded-lg p-4 flex gap-3">
-              <Ban size={16} className="text-signal-press flex-shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <div className="text-sm font-medium text-ink-primary">{x.title}</div>
-                <p className="text-xs text-ink-secondary leading-relaxed">{x.body}</p>
+            <h1 className="mt-7 font-display text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[1.04] tracking-[-0.025em] text-ink-primary max-w-[16ch] [text-wrap:pretty]">
+              Scenario seeds for <span className="font-semibold text-brand-fire">TUNA</span> conditions.
+            </h1>
+
+            <p className="mt-7 text-[clamp(1.125rem,1.6vw,1.375rem)] leading-[1.45] text-ink-secondary max-w-[38ch] [text-wrap:pretty]">
+              A morphological seed generator for futures characterised by{' '}
+              <span className="text-ink-primary font-medium">turbulence, unpredictability, novelty, and ambiguity</span>{' '}
+              — built to address the structural weaknesses of the standard 2×2 driving-forces method.
+            </p>
+
+            <div className="mt-10 flex items-center flex-wrap gap-6">
+              <button
+                onClick={onBegin}
+                className="group inline-flex items-center gap-2.5 px-[22px] py-[13px] rounded-md bg-brand-fire hover:brightness-110 text-ink-inverse text-[15px] font-medium tracking-[-0.005em] shadow-[0_1px_0_rgba(0,0,0,0.04),0_6px_18px_-8px_rgba(255,58,5,0.55)] transition"
+              >
+                Begin
+                <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+              </button>
+              <a
+                href="#example"
+                className="group inline-flex items-center gap-2 text-[14px] font-medium text-ink-primary py-[11px] border-b border-ink-primary transition-all hover:gap-3"
+              >
+                See an example output
+                <ArrowRight size={13} />
+              </a>
+            </div>
+
+            <div className="mt-7 flex flex-wrap items-center gap-x-9 gap-y-2 font-mono text-[11.5px] tracking-wide text-ink-muted">
+              <span className="inline-flex items-center gap-2 after:content-[''] after:w-[3px] after:h-[3px] after:rounded-full after:bg-surface-border after:ml-3 last:after:hidden">10 steps</span>
+              <span className="inline-flex items-center gap-2 after:content-[''] after:w-[3px] after:h-[3px] after:rounded-full after:bg-surface-border after:ml-3 last:after:hidden">~30 minutes</span>
+              <span className="inline-flex items-center gap-2 after:content-[''] after:w-[3px] after:h-[3px] after:rounded-full after:bg-surface-border after:ml-3 last:after:hidden">entirely client-side</span>
+              <span className="inline-flex items-center">no account required</span>
+            </div>
+
+            {/* TUNA acronym block */}
+            <div className="mt-14 relative bg-surface-raised border border-surface-border/70 rounded-[10px] p-7 grid grid-cols-4">
+              <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand-fire rounded-l" aria-hidden="true" />
+              {TUNA_LETTERS.map((l, i) => (
+                <div key={l.char} className={`px-4 ${i < TUNA_LETTERS.length - 1 ? 'border-r border-surface-border/70' : ''}`}>
+                  <div className="font-display text-[36px] font-semibold leading-none tracking-[-0.02em] text-ink-primary">{l.char}</div>
+                  <div className="mt-2 font-mono text-[11px] tracking-[0.04em] text-ink-secondary lowercase">{l.word}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hero visual: morphological field preview */}
+          <aside
+            aria-label="Morphological field preview"
+            className="relative bg-surface-raised border border-surface-border/70 rounded-[12px] p-[22px] shadow-[0_1px_0_rgba(0,0,0,0.02),0_30px_60px_-40px_rgba(46,46,54,0.18)]"
+          >
+            <div className="flex items-center justify-between pb-3.5 border-b border-surface-border/60">
+              <div className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-secondary">Morphological field — preview</div>
+              <div className="font-mono text-[11px] text-ink-muted">step <span className="text-brand-fire font-medium">06 / 10</span></div>
+            </div>
+
+            <div className="pt-4">
+              <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.04em] text-ink-muted mb-2.5">
+                <span>Drivers ↓</span>
+                <span>States →</span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {MORPH_PREVIEW.map((row, i) => (
+                  <div key={i} className="grid grid-cols-[110px_1fr] gap-3.5 items-center">
+                    <div className="flex items-center gap-1.5 font-mono text-[10.5px] tracking-[0.02em] text-ink-secondary">
+                      <span className="w-1.5 h-1.5 rounded-full bg-surface-border" />
+                      {row.label}
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {row.cells.map((c, j) => <MorphCell key={j} kind={c} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="relative h-px mt-5 -mx-[22px] bg-gradient-to-r from-transparent via-surface-border to-transparent overflow-hidden">
+                <span className="absolute -top-px h-[3px] w-[60px] bg-gradient-to-r from-transparent via-brand-fire to-transparent animate-tuna-pulse" />
+              </div>
+
+              <div className="mt-3.5 flex justify-between items-center font-mono text-[10.5px] text-ink-muted">
+                <span>Selected configuration</span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-surface-base border border-surface-border/60 rounded">
+                  seed-04 · coherence 0.87
+                </span>
               </div>
             </div>
-          ))}
+          </aside>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="border-t border-surface-border pt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <div className="font-display text-xl text-ink-primary">Ready to begin.</div>
-          <p className="text-sm text-ink-secondary">
-            The default fixture is loaded with an AI-and-economy 15-year horizon. Reset to start clean, or work through the steps to produce your seed set.
-          </p>
+      {/* ===================== AUDIENCE STRIP ===================== */}
+      <div className="border-t border-b border-surface-border/70 bg-surface-muted px-6 lg:px-8 py-5">
+        <div className="max-w-[1240px] mx-auto flex flex-wrap items-center gap-x-8 gap-y-2.5 font-mono text-[11.5px] tracking-[0.04em] text-ink-secondary">
+          <span className="text-ink-muted text-[10.5px] uppercase">Built for</span>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {LANDING_AUDIENCE.map(a => (
+              <span key={a} className="text-ink-primary font-medium">{a}</span>
+            ))}
+          </div>
         </div>
-        <button
-          onClick={onBegin}
-          className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-6 py-3 rounded transition flex-shrink-0"
-        >
-          Start the workflow <ArrowRight size={16} />
-        </button>
+      </div>
+
+      {/* ===================== PROBLEM ===================== */}
+      <section id="problem" className="px-6 lg:px-8 py-24 lg:py-30">
+        <div className="max-w-[1100px] mx-auto">
+          <div className="inline-flex items-center gap-3 mb-8 font-mono text-[11px] uppercase tracking-[0.08em] text-brand-fire">
+            <span className="block w-7 h-px bg-brand-fire" />
+            The problem
+          </div>
+          <h2 className="font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-medium leading-[1.1] tracking-[-0.02em] text-ink-primary max-w-[22ch] mb-6 [text-wrap:balance]">
+            The dominant scenario method has three structural weaknesses.
+          </h2>
+          <p className="text-[17px] leading-[1.55] text-ink-secondary max-w-[65ch] [text-wrap:pretty]">
+            The Global Business Network intuitive-logics method, codified by Schwartz, Wack, and Ogilvy in the 1980s, has been consensus practice in corporate strategy for forty years. It produces four scenarios by selecting two high-impact, high-uncertainty driving forces as axes of a 2×2 matrix. The method works — but experienced practitioners work around three weaknesses informally.
+          </p>
+
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {LANDING_PROBLEMS.map(p => {
+              const cls = accentToClass[p.accent];
+              return (
+                <article key={p.num} className="group relative bg-surface-raised border border-surface-border/70 rounded-[10px] p-7 transition-all hover:-translate-y-0.5 hover:shadow-[0_1px_0_rgba(0,0,0,0.02),0_24px_40px_-28px_rgba(46,46,54,0.2)]">
+                  <div className="flex items-center gap-2.5 mb-5 font-mono text-[11px] tracking-[0.06em] text-ink-muted">
+                    <span className={`w-2 h-2 rounded-sm ${cls.dot}`} />
+                    Weakness {p.num}
+                  </div>
+                  <h3 className="font-display text-[19px] font-semibold leading-[1.3] tracking-[-0.015em] text-ink-primary mb-3">
+                    {p.title}
+                  </h3>
+                  <p className="text-[14.5px] leading-[1.55] text-ink-secondary">{p.body}</p>
+                  <div className={`mt-5 pt-4 border-t border-dashed border-surface-border/70 font-mono text-[10.5px] uppercase tracking-[0.04em] ${cls.tag}`}>
+                    {p.tag}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
       </section>
+
+      {/* ===================== METHOD ===================== */}
+      <section id="method" className="border-t border-b border-surface-border/70 bg-surface-muted px-6 lg:px-8 py-24 lg:py-30">
+        <div className="max-w-[1100px] mx-auto">
+          <div className="inline-flex items-center gap-3 mb-8 font-mono text-[11px] uppercase tracking-[0.08em] text-brand-fire">
+            <span className="block w-7 h-px bg-brand-fire" />
+            The method
+          </div>
+          <h2 className="font-display text-[clamp(1.875rem,3.4vw,2.75rem)] font-medium leading-[1.1] tracking-[-0.02em] text-ink-primary max-w-[22ch] mb-6 [text-wrap:balance]">
+            Ten steps, from drivers to seeds.
+          </h2>
+          <p className="text-[17px] leading-[1.55] text-ink-secondary max-w-[65ch] [text-wrap:pretty]">
+            The Finder replaces the 2×2 with a morphological field — a matrix of drivers crossed with possible states. You build it, sample it, and validate the resulting seeds for structural distinctness, internal coherence, and temporal anchoring.
+          </p>
+
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 items-start">
+            <div className="border-t border-surface-border/70">
+              {LANDING_STEPS.map(s => (
+                <div
+                  key={s.num}
+                  className={`grid grid-cols-[60px_1fr_auto] gap-4 px-2 py-[18px] border-b border-surface-border/70 items-baseline transition-colors hover:bg-surface-raised/60 ${s.active ? '' : ''}`}
+                >
+                  <div className={`font-mono text-[12px] tracking-[0.04em] ${s.active ? 'text-brand-fire' : 'text-ink-muted'}`}>{s.num}</div>
+                  <div className="text-[15px] font-medium tracking-[-0.005em] text-ink-primary">{s.title}</div>
+                  <div className="font-mono text-[11px] text-ink-muted">{s.hint}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-surface-raised border border-surface-border/70 rounded-[10px] p-6 md:sticky md:top-24">
+              <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-ink-secondary m-0 mb-4">
+                Step 04 — Building the field
+              </p>
+              <div className="min-h-[280px]">
+                <MethodFigureSVG />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================== CTA ===================== */}
+      <section id="begin" className="bg-ink-primary text-surface-base px-6 lg:px-8 py-24 lg:py-30">
+        <div className="max-w-[1100px] mx-auto">
+          <div className="inline-flex items-center gap-3 mb-8 font-mono text-[11px] uppercase tracking-[0.08em] text-brand-fire">
+            <span className="block w-7 h-px bg-brand-fire" />
+            Get started
+          </div>
+          <h2 className="font-display text-[clamp(2.125rem,4vw,3.5rem)] font-medium leading-[1.05] tracking-[-0.025em] mb-6 max-w-[18ch] [text-wrap:balance]">
+            Ten steps. Thirty minutes. <span className="text-brand-fire not-italic">Defensible seeds.</span>
+          </h2>
+          <p className="text-[17px] leading-[1.55] text-surface-base/70 max-w-[56ch] mb-10">
+            Runs entirely in your browser. Nothing is uploaded. Export your scenario seeds as JSON or markdown when you&apos;re done — bring them into your strategy decks, narrative scenarios, or red-team workshops.
+          </p>
+          <div className="flex items-center gap-6 flex-wrap">
+            <button
+              onClick={onBegin}
+              className="group inline-flex items-center gap-2.5 px-[22px] py-[13px] rounded-md bg-brand-fire hover:brightness-110 text-ink-inverse text-[15px] font-medium tracking-[-0.005em] shadow-[0_6px_18px_-8px_rgba(255,58,5,0.6)] transition"
+            >
+              Begin the workflow
+              <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
+            </button>
+            <a
+              href="#"
+              className="group inline-flex items-center gap-2 text-[14px] font-medium text-surface-base py-[11px] border-b border-surface-base/50 hover:border-surface-base transition-all hover:gap-3"
+            >
+              Read the methodology paper
+              <ArrowRight size={13} />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================== FOOTER ===================== */}
+      <footer className="border-t border-surface-border/70 bg-surface-base px-6 lg:px-8 py-8">
+        <div className="max-w-[1240px] mx-auto flex items-baseline justify-between flex-wrap gap-5 font-mono text-[11px] tracking-[0.02em] text-ink-muted">
+          <div>© 2026 Peter Verster — Advisor · Author · Strategist</div>
+          <nav className="flex gap-6">
+            <a href="#method" className="hover:text-ink-primary transition">Methodology</a>
+            <a href="https://github.com/peterverster/tuna-scenario-finder" target="_blank" rel="noreferrer" className="hover:text-ink-primary transition">Source on GitHub</a>
+            <a href="https://peterverster.com" target="_blank" rel="noreferrer" className="hover:text-ink-primary transition">peterverster.com</a>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }
