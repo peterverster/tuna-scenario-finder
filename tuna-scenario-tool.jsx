@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Wand2, Loader2, RefreshCw, FileText, Upload, Check, BookOpen, Compass, Layers, Activity, Ban } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Download, Upload, Check, BookOpen, Compass, Layers, Activity, Ban, FileText, Share2, Copy, AlertTriangle } from 'lucide-react';
 
 // ============================================================
 // CONSTANTS
@@ -233,6 +233,13 @@ const SEED_COLORS = [
 
 const HORIZON_YEARS = 15; // velocity 0 → 15 yrs out, velocity 1 → 0 yrs
 
+// Persistence + sharing
+const SCHEMA_VERSION = 'tuna-scenario/v1';
+const SCENARIO_PATH_PREFIX = '/scenarios/';
+const SCENARIO_FETCH_TIMEOUT_MS = 5000;
+const PUBLISH_HEAD_TIMEOUT_MS = 1000;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // ============================================================
 // MATH
 // ============================================================
@@ -277,72 +284,6 @@ function setMatrixVal(matrix, i, j, val) {
   m[i][j] = val;
   m[j][i] = 1 / val;
   return m;
-}
-
-// Extract scenario fields from a markdown-formatted LLM response.
-// Returns an object with keys: name, tagline, narrative, tension, signals, implications.
-// Tolerant of variations in heading capitalisation, missing sections, and stray fences.
-function parseScenarioMarkdown(rawText) {
-  if (!rawText || typeof rawText !== 'string') {
-    return { name: null };
-  }
-
-  // Strip any code fences the model might still wrap things in.
-  let text = rawText.replace(/```(?:markdown|md)?\s*/gi, '').replace(/```\s*/g, '').trim();
-
-  const result = { name: null, tagline: null, narrative: null, tension: null, signals: [], implications: null };
-
-  // Extract name from first H1 heading.
-  const nameMatch = text.match(/^#\s+(.+?)\s*$/m);
-  if (nameMatch) {
-    result.name = nameMatch[1].trim().replace(/^["']|["']$/g, '');
-  }
-
-  // Extract tagline — the first italic line after the title, or the first non-heading paragraph.
-  const afterTitle = nameMatch ? text.slice(text.indexOf(nameMatch[0]) + nameMatch[0].length) : text;
-  const taglineMatch = afterTitle.match(/^\s*\*([^*\n]+)\*\s*$/m) || afterTitle.match(/^\s*_([^_\n]+)_\s*$/m);
-  if (taglineMatch) {
-    result.tagline = taglineMatch[1].trim();
-  }
-
-  // Find each section by H2 heading. Section names are matched loosely (case-insensitive,
-  // tolerant of slight wording variation).
-  const sectionPatterns = [
-    { key: 'narrative',    pattern: /^##\s+narrative\s*$/im },
-    { key: 'tension',      pattern: /^##\s+(?:structural\s+)?tension\s*$/im },
-    { key: 'signals',      pattern: /^##\s+(?:observable\s+)?signals?\s*$/im },
-    { key: 'implications', pattern: /^##\s+(?:strategic\s+)?implications?\s*$/im },
-  ];
-
-  // Find heading positions to determine section boundaries.
-  const sectionStarts = [];
-  for (const { key, pattern } of sectionPatterns) {
-    const m = text.match(pattern);
-    if (m) sectionStarts.push({ key, start: m.index, headingLength: m[0].length });
-  }
-  sectionStarts.sort((a, b) => a.start - b.start);
-
-  for (let i = 0; i < sectionStarts.length; i++) {
-    const { key, start, headingLength } = sectionStarts[i];
-    const contentStart = start + headingLength;
-    const contentEnd = (i + 1 < sectionStarts.length) ? sectionStarts[i + 1].start : text.length;
-    const content = text.slice(contentStart, contentEnd).trim();
-
-    if (key === 'signals') {
-      // Extract bullet items.
-      const items = [];
-      const lines = content.split('\n');
-      for (const line of lines) {
-        const m = line.match(/^\s*[-*+]\s+(.+?)\s*$/);
-        if (m) items.push(m[1].trim());
-      }
-      result.signals = items;
-    } else {
-      result[key] = content;
-    }
-  }
-
-  return result;
 }
 
 function generateAllSeeds(numFactors, numStates, cap = 200000) {
@@ -633,6 +574,269 @@ function estimateArrival(seed, arrows, factors, stateValues) {
 }
 
 // ============================================================
+// PERSISTENCE
+// ============================================================
+
+// Generate a UUID v4. Uses crypto.randomUUID where available, with a Math.random
+// fallback for older browsers (good enough for unique identifiers; warns once).
+let _uuidWarned = false;
+function generateUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (!_uuidWarned) {
+    console.warn('crypto.randomUUID unavailable; falling back to Math.random UUID v4.');
+    _uuidWarned = true;
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function isValidUuid(s) {
+  return typeof s === 'string' && UUID_REGEX.test(s);
+}
+
+// Convert a Set of veto keys into a stable, sorted array for serialisation.
+function serialiseVetoes(vetoesSet) {
+  return Array.from(vetoesSet || []).sort();
+}
+
+// Build the canonical project file (FR-001 schema).
+function serializeProject(state) {
+  const {
+    scenarioId, projectName,
+    factors, criteria, criteriaMatrix, factorMatrices, topN,
+    factorArrows, factorStates, stateLabelOverrides,
+    couplingMatrix, triggerMatrix, vetoes,
+    K, alpha, convergenceFocus, coherenceThreshold,
+    seedNames, seedPhases,
+    purpose, audiencePreset, audienceCustom, documents,
+  } = state;
+  return {
+    schema: SCHEMA_VERSION,
+    scenarioId,
+    meta: {
+      exportedAt: new Date().toISOString(),
+      appVersion: import.meta?.env?.VITE_APP_VERSION || 'dev',
+      projectName: (projectName && projectName.trim()) || 'Untitled',
+    },
+    project: {
+      factors,
+      criteria,
+      criteriaMatrix,
+      factorMatrices,
+      topN,
+      factorArrows,
+      factorStates,
+      stateLabelOverrides,
+      couplingMatrix,
+      triggerMatrix,
+      vetoes: serialiseVetoes(vetoes),
+      generation: { K, alpha, convergenceFocus, coherenceThreshold },
+      seedNames,
+      seedPhases,
+      context: { purpose, audiencePreset, audienceCustom, documents },
+    },
+  };
+}
+
+// Lightweight structural validation. Returns { ok, error?, state? } where state is
+// a flat shape ready for setters in TUNAScenarioTool.
+function deserializeProject(parsed) {
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, error: "That file isn't valid JSON." };
+  }
+  if (typeof parsed.schema !== 'string') {
+    return { ok: false, error: 'This file is missing schema info — it may not be a TUNA project export.' };
+  }
+  if (parsed.schema !== SCHEMA_VERSION) {
+    if (parsed.schema.startsWith('tuna-scenario/v')) {
+      return { ok: false, error: 'This file was created by a different version of the tool.' };
+    }
+    return { ok: false, error: `Unknown schema "${parsed.schema}".` };
+  }
+  if (!isValidUuid(parsed.scenarioId)) {
+    return { ok: false, error: 'This file is missing or has an invalid scenario ID.' };
+  }
+  const p = parsed.project;
+  if (!p || typeof p !== 'object') {
+    return { ok: false, error: 'This file is missing project data.' };
+  }
+  const required = [
+    'factors', 'criteria', 'criteriaMatrix', 'factorMatrices', 'topN',
+    'factorArrows', 'factorStates', 'stateLabelOverrides',
+    'couplingMatrix', 'triggerMatrix', 'vetoes', 'generation',
+    'seedNames', 'seedPhases', 'context',
+  ];
+  for (const k of required) {
+    if (!(k in p)) return { ok: false, error: `This file is missing required data ("${k}").` };
+  }
+  if (!Array.isArray(p.factors) || p.factors.length === 0) {
+    return { ok: false, error: 'Factors must be a non-empty array.' };
+  }
+  if (!Array.isArray(p.criteria) || p.criteria.length === 0) {
+    return { ok: false, error: 'Criteria must be a non-empty array.' };
+  }
+  if (!Array.isArray(p.criteriaMatrix) || p.criteriaMatrix.length !== p.criteria.length) {
+    return { ok: false, error: "The criteria pairwise matrix doesn't match the criteria count." };
+  }
+  for (const row of p.criteriaMatrix) {
+    if (!Array.isArray(row) || row.length !== p.criteria.length) {
+      return { ok: false, error: 'Criteria matrix is not square.' };
+    }
+  }
+  if (!Array.isArray(p.couplingMatrix)) {
+    return { ok: false, error: 'Coupling matrix is malformed.' };
+  }
+  const N = p.couplingMatrix.length;
+  for (let i = 0; i < N; i++) {
+    if (!Array.isArray(p.couplingMatrix[i]) || p.couplingMatrix[i].length !== N) {
+      return { ok: false, error: 'Coupling matrix is not square.' };
+    }
+    if (p.couplingMatrix[i][i] !== 0) {
+      return { ok: false, error: 'Coupling matrix diagonal must be zero.' };
+    }
+    for (let j = i + 1; j < N; j++) {
+      if (p.couplingMatrix[i][j] !== p.couplingMatrix[j][i]) {
+        return { ok: false, error: 'Coupling matrix must be symmetric.' };
+      }
+    }
+  }
+  // Seed-space cap (BR-007)
+  if (Array.isArray(p.factorStates) && Number.isFinite(p.topN)) {
+    const total = Math.pow(p.factorStates.length, Math.min(p.topN, p.factors.length));
+    if (total > 200000) {
+      return { ok: false, error: 'This project has too many seed candidates to enumerate.' };
+    }
+  }
+  // Validation passed; flatten for state setters.
+  return {
+    ok: true,
+    state: {
+      scenarioId: parsed.scenarioId,
+      projectName: parsed.meta?.projectName || 'Untitled',
+      factors: p.factors,
+      criteria: p.criteria,
+      criteriaMatrix: p.criteriaMatrix,
+      factorMatrices: p.factorMatrices,
+      topN: p.topN,
+      factorArrows: p.factorArrows,
+      factorStates: p.factorStates,
+      stateLabelOverrides: p.stateLabelOverrides,
+      couplingMatrix: p.couplingMatrix,
+      triggerMatrix: p.triggerMatrix,
+      vetoes: new Set(Array.isArray(p.vetoes) ? p.vetoes : []),
+      K: p.generation?.K ?? 4,
+      alpha: p.generation?.alpha ?? 0.5,
+      convergenceFocus: p.generation?.convergenceFocus ?? 0.6,
+      coherenceThreshold: p.generation?.coherenceThreshold ?? 0.4,
+      seedNames: p.seedNames || {},
+      seedPhases: p.seedPhases || {},
+      purpose: p.context?.purpose || '',
+      audiencePreset: p.context?.audiencePreset || 'mixed',
+      audienceCustom: p.context?.audienceCustom || '',
+      documents: Array.isArray(p.context?.documents) ? p.context.documents : [],
+    },
+  };
+}
+
+// Trigger a Blob download for a JSON object with the given filename.
+function triggerJsonDownload(filename, jsonObj) {
+  const blob = new Blob([JSON.stringify(jsonObj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Resolve the canonical host for share URLs. VITE_PUBLIC_HOST overrides
+// window.location.origin (useful when the dev URL is localhost but you want to
+// generate links pointing at the deployed host).
+function getPublicOrigin() {
+  const env = import.meta?.env?.VITE_PUBLIC_HOST;
+  if (env && typeof env === 'string') return env.replace(/\/+$/, '');
+  return typeof window !== 'undefined' ? window.location.origin : '';
+}
+
+// Build the share URL + JSON Blob for a state. Pure; no HTTP.
+function buildShareUrl(state) {
+  const id = state.scenarioId;
+  const url = `${getPublicOrigin()}${SCENARIO_PATH_PREFIX}${id}`;
+  const json = serializeProject(state);
+  return { url, scenarioId: id, json };
+}
+
+// Extract a UUID from a `/scenarios/<uuid>` pathname; null otherwise.
+function parseScenarioPath(pathname) {
+  if (typeof pathname !== 'string') return null;
+  const m = pathname.match(/^\/scenarios\/([0-9a-f-]{36})\/?$/i);
+  if (!m) return null;
+  if (!isValidUuid(m[1])) return null;
+  return m[1];
+}
+
+// HEAD request with a tight timeout to detect whether <uuid>.json is reachable.
+async function checkPublishStatus(uuid) {
+  if (!isValidUuid(uuid)) return 'unknown';
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), PUBLISH_HEAD_TIMEOUT_MS);
+    const res = await fetch(`${SCENARIO_PATH_PREFIX}${uuid}.json`, { method: 'HEAD', signal: ctl.signal });
+    clearTimeout(timer);
+    if (res.ok) return 'live';
+    if (res.status === 404) return 'not-yet';
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+// Fetch the static JSON file for a UUID and validate it. Returns
+// { ok, state? , errorKind: 'not-found' | 'network' | 'format' }.
+async function fetchScenarioJson(uuid) {
+  if (!isValidUuid(uuid)) {
+    return { ok: false, errorKind: 'format' };
+  }
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), SCENARIO_FETCH_TIMEOUT_MS);
+    const res = await fetch(`${SCENARIO_PATH_PREFIX}${uuid}.json`, { signal: ctl.signal });
+    clearTimeout(timer);
+    if (res.status === 404) return { ok: false, errorKind: 'not-found' };
+    if (!res.ok) return { ok: false, errorKind: 'network' };
+    const parsed = await res.json();
+    const result = deserializeProject(parsed);
+    if (!result.ok) return { ok: false, errorKind: 'format' };
+    return { ok: true, state: result.state };
+  } catch {
+    return { ok: false, errorKind: 'network' };
+  }
+}
+
+// Read a File and return its parsed JSON content.
+function readJsonFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        resolve(JSON.parse(reader.result));
+      } catch {
+        reject(new Error("That file isn't valid JSON."));
+      }
+    };
+    reader.onerror = () => reject(new Error('Could not read file.'));
+    reader.readAsText(file);
+  });
+}
+
+// ============================================================
 // SHARED UI
 // ============================================================
 
@@ -646,9 +850,9 @@ const fontStack = `
 function ConsistencyBadge({ cr }) {
   const pct = (cr * 100).toFixed(1);
   let cls, label;
-  if (cr <= 0.1) { cls = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'; label = 'Consistent'; }
-  else if (cr <= 0.15) { cls = 'bg-amber-500/10 text-amber-400 border-amber-500/30'; label = 'Borderline'; }
-  else { cls = 'bg-rose-500/10 text-rose-400 border-rose-500/30'; label = 'Inconsistent'; }
+  if (cr <= 0.1) { cls = 'bg-signal-advisory/10 text-signal-advisory border-signal-advisory/30'; label = 'Consistent'; }
+  else if (cr <= 0.15) { cls = 'bg-brand-fire/10 text-brand-fire border-brand-fire/30'; label = 'Borderline'; }
+  else { cls = 'bg-signal-press/10 text-signal-press border-signal-press/30'; label = 'Inconsistent'; }
   return (
     <span className={`inline-flex items-center gap-2 text-xs font-mono px-2.5 py-1 rounded border ${cls}`}>
       CR {pct}% · {label}
@@ -675,17 +879,17 @@ function PairwiseRow({ nameA, nameB, value, onChange }) {
     : `${dominant} is ${intensityLabel(pos)} more important (${Math.abs(pos) + 1}×)`;
 
   const aClass = pos === 0
-    ? 'text-slate-200'
-    : pos < 0 ? 'text-amber-300' : 'text-slate-600';
+    ? 'text-ink-secondary'
+    : pos < 0 ? 'text-brand-fire/80' : 'text-ink-muted';
   const bClass = pos === 0
-    ? 'text-slate-200'
-    : pos > 0 ? 'text-amber-300' : 'text-slate-600';
+    ? 'text-ink-secondary'
+    : pos > 0 ? 'text-brand-fire/80' : 'text-ink-muted';
 
   return (
-    <div className="py-3 border-b border-slate-800 last:border-0">
+    <div className="py-3 border-b border-surface-border last:border-0">
       <div className="flex items-center gap-4 mb-2">
         <div className={`flex-1 text-right text-sm font-medium transition-colors ${aClass}`}>{nameA}</div>
-        <div className="text-xs font-mono text-slate-500 px-2">vs</div>
+        <div className="text-xs font-mono text-ink-muted px-2">vs</div>
         <div className={`flex-1 text-left text-sm font-medium transition-colors ${bClass}`}>{nameB}</div>
       </div>
       <div className="flex justify-center gap-0.5">
@@ -699,10 +903,10 @@ function PairwiseRow({ nameA, nameB, value, onChange }) {
               className={`
                 ${isCenter ? 'w-8' : 'w-7'} h-8 text-xs font-mono rounded transition-all
                 ${active
-                  ? 'bg-amber-500 text-slate-950 font-semibold shadow-lg shadow-amber-500/20'
+                  ? 'bg-brand-fire text-surface-base font-semibold shadow-lg shadow-brand-fire/20'
                   : isCenter
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-300'
+                    ? 'bg-surface-border text-ink-secondary hover:bg-ink-muted'
+                    : 'bg-surface-border text-ink-muted hover:bg-surface-border hover:text-ink-secondary'
                 }
               `}
               title={isCenter ? 'Equal' : `${Math.abs(p) + 1}× ${p < 0 ? nameA : nameB}`}
@@ -712,7 +916,7 @@ function PairwiseRow({ nameA, nameB, value, onChange }) {
           );
         })}
       </div>
-      <div className="text-center mt-2 text-xs font-mono text-slate-500">{description}</div>
+      <div className="text-center mt-2 text-xs font-mono text-ink-muted">{description}</div>
     </div>
   );
 }
@@ -724,11 +928,11 @@ function SmallSlider({ label, icon: Icon, value, onChange, min = 0, max = 1, ste
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
-        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 text-xs font-mono text-ink-secondary uppercase tracking-wider">
           {Icon && <Icon size={11} />}
           {label}
         </div>
-        <div className="text-xs font-mono text-amber-400">
+        <div className="text-xs font-mono text-brand-fire">
           {signed ? (value > 0 ? '+' : '') + value.toFixed(2) : value.toFixed(2)}
         </div>
       </div>
@@ -737,11 +941,175 @@ function SmallSlider({ label, icon: Icon, value, onChange, min = 0, max = 1, ste
         min={min} max={max} step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-amber-500"
+        className="w-full accent-brand-fire"
       />
-      <div className="flex justify-between text-[10px] font-mono text-slate-600 mt-1">
+      <div className="flex justify-between text-[10px] font-mono text-ink-muted mt-1">
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function ShareModal({ isOpen, onClose, scenarioId, projectName, onProjectNameChange, onDownloadJson, onDuplicate }) {
+  const [publishStatus, setPublishStatus] = useState('checking');
+  const [copied, setCopied] = useState(false);
+  const url = scenarioId ? `${getPublicOrigin()}${SCENARIO_PATH_PREFIX}${scenarioId}` : '';
+  useEffect(() => {
+    if (!isOpen || !scenarioId) return undefined;
+    setPublishStatus('checking');
+    setCopied(false);
+    let cancelled = false;
+    checkPublishStatus(scenarioId).then(s => { if (!cancelled) setPublishStatus(s); });
+    return () => { cancelled = true; };
+  }, [isOpen, scenarioId]);
+
+  const onCopy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const StatusBadge = () => {
+    if (publishStatus === 'live') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono bg-signal-advisory/15 text-signal-advisory border border-signal-advisory/30">
+          <Check size={10} /> Published — URL is live
+        </span>
+      );
+    }
+    if (publishStatus === 'not-yet') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono bg-signal-thought/15 text-signal-thought border border-signal-thought/30">
+          <AlertTriangle size={10} /> Not yet published
+        </span>
+      );
+    }
+    if (publishStatus === 'checking') {
+      return <span className="text-[10px] font-mono text-ink-muted">checking…</span>;
+    }
+    return null;
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Share scenario" maxWidth="max-w-xl">
+      <div className="space-y-5">
+        <div>
+          <label className="block text-[10px] font-mono uppercase tracking-widest text-ink-muted mb-1.5">Project name</label>
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => onProjectNameChange(e.target.value)}
+            placeholder="Untitled project"
+            className="w-full bg-surface-base border border-surface-border rounded px-3 py-2 text-sm text-ink-primary placeholder-ink-muted focus:border-brand-fire focus:outline-none transition"
+          />
+          <p className="text-[10px] text-ink-muted mt-1">Used in `meta.projectName` of the export. Optional — does not affect the URL.</p>
+        </div>
+
+        <div>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-ink-muted">Public URL</label>
+            <StatusBadge />
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={url}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 bg-surface-base border border-surface-border rounded px-3 py-2 text-sm font-mono text-ink-primary"
+            />
+            <button
+              onClick={onCopy}
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-brand-fire/15 hover:bg-brand-fire/25 text-brand-fire border border-brand-fire/40 transition"
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-surface-border pt-4">
+          <div className="text-xs text-ink-secondary leading-relaxed mb-3">
+            To make this URL live, save the JSON to <code className="font-mono text-brand-fire/80 text-[11px]">public/scenarios/{scenarioId}.json</code> in this repo, commit, and push. Vercel will redeploy and the link will resolve.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onDownloadJson}
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-brand-fire hover:bg-brand-fire/90 text-ink-inverse font-medium transition"
+            >
+              <Download size={14} /> Download JSON
+            </button>
+            <button
+              onClick={onDuplicate}
+              className="flex items-center gap-1.5 px-3 py-2 rounded text-sm text-ink-secondary hover:text-ink-primary border border-surface-border hover:border-ink-muted transition"
+              title="Mint a new UUID so this becomes a fork — useful when adapting a published scenario without overwriting the original."
+            >
+              <Sparkles size={14} /> Fork as new scenario
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }) {
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+  if (!isOpen) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className={`${maxWidth} w-full bg-surface-raised border border-surface-border rounded-lg shadow-2xl`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-surface-border">
+          <h2 className="font-display text-lg text-ink-primary leading-tight">{title}</h2>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary transition" aria-label="Close">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ message, kind = 'info', onClose }) {
+  useEffect(() => {
+    if (!message) return undefined;
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [message, onClose]);
+  if (!message) return null;
+  const color = kind === 'error' ? 'border-signal-press text-signal-press'
+              : kind === 'success' ? 'border-signal-advisory text-signal-advisory'
+              : 'border-brand-fire/60 text-ink-primary';
+  return (
+    <div className="fixed bottom-6 right-6 z-50 max-w-sm">
+      <div className={`bg-surface-raised border rounded-lg shadow-xl px-4 py-3 text-sm ${color}`}>
+        {message}
       </div>
     </div>
   );
@@ -753,6 +1121,16 @@ function SmallSlider({ label, icon: Icon, value, onChange, min = 0, max = 1, ste
 
 export default function TUNAScenarioTool() {
   const [step, setStep] = useState(0);
+  // Project identity — UUID generated lazily on first export/share; persists across imports.
+  const [scenarioId, setScenarioId] = useState(null);
+  const [projectName, setProjectName] = useState('');
+  // UI: portability dialogs and toast
+  const [importError, setImportError] = useState(null);
+  const [importConfirmFile, setImportConfirmFile] = useState(null);
+  const [toast, setToast] = useState(null); // { message, kind }
+  const [shareOpen, setShareOpen] = useState(false);
+  const [loadError, setLoadError] = useState(null); // { kind: 'not-found'|'network'|'format', uuid }
+  const [hydratingFromUrl, setHydratingFromUrl] = useState(() => parseScenarioPath(typeof window !== 'undefined' ? window.location.pathname : '') !== null);
   const [factors, setFactors] = useState(DEFAULT_FACTORS);
   const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
   const [criteriaMatrix, setCriteriaMatrix] = useState(() => DEFAULT_CRITERIA_MATRIX.map(r => [...r]));
@@ -799,9 +1177,31 @@ export default function TUNAScenarioTool() {
   const [audienceCustom, setAudienceCustom] = useState('');
   const [documents, setDocuments] = useState(DEFAULT_DOCUMENTS.map(d => ({ ...d })));
   // AI scenario generation state
-  const [generatedScenarios, setGeneratedScenarios] = useState({});
-  const [generatingIdx, setGeneratingIdx] = useState(null);
+  // Errors from building the AI prompt download (kept; download itself can't fail
+  // visibly, but a malformed buildPrompt could throw)
   const [generationErrors, setGenerationErrors] = useState({});
+
+  // On mount: if URL is /scenarios/<uuid>, fetch and hydrate. Otherwise no-op.
+  // We deliberately preserve the URL after hydration (refresh re-fetches).
+  useEffect(() => {
+    const uuid = parseScenarioPath(typeof window !== 'undefined' ? window.location.pathname : '');
+    if (!uuid) return;
+    let cancelled = false;
+    (async () => {
+      const result = await fetchScenarioJson(uuid);
+      if (cancelled) return;
+      if (result.ok) {
+        applyHydratedState(result.state);
+        setStep(10);
+      } else {
+        setLoadError({ kind: result.errorKind, uuid });
+        setStep(0);
+      }
+      setHydratingFromUrl(false);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync matrices when factors / criteria change
   useEffect(() => {
@@ -944,9 +1344,125 @@ export default function TUNAScenarioTool() {
     5: true, 6: true, 7: factorStates.length >= 2, 8: true, 9: true, 10: true,
   };
 
+  // === Project identity helpers ===
+  // Returns the current scenarioId, generating one lazily if missing.
+  const ensureScenarioId = () => {
+    if (scenarioId) return scenarioId;
+    const id = generateUuid();
+    setScenarioId(id);
+    return id;
+  };
+
+  // Snapshot all serialisable state. The id passed in lets callers force a fresh UUID.
+  const collectState = (id) => ({
+    scenarioId: id,
+    projectName,
+    factors, criteria, criteriaMatrix, factorMatrices, topN,
+    factorArrows, factorStates, stateLabelOverrides,
+    couplingMatrix, triggerMatrix, vetoes,
+    K, alpha, convergenceFocus, coherenceThreshold,
+    seedNames, seedPhases,
+    purpose, audiencePreset, audienceCustom, documents,
+  });
+
+  // Apply a hydrated, validated state object to all React setters atomically.
+  const applyHydratedState = (s) => {
+    setScenarioId(s.scenarioId);
+    setProjectName(s.projectName || '');
+    setFactors(s.factors);
+    setCriteria(s.criteria);
+    setCriteriaMatrix(s.criteriaMatrix);
+    setFactorMatrices(s.factorMatrices);
+    setTopN(s.topN);
+    setFactorArrows(s.factorArrows);
+    setFactorStates(s.factorStates);
+    setStateLabelOverrides(s.stateLabelOverrides);
+    setCouplingMatrix(s.couplingMatrix);
+    setTriggerMatrix(s.triggerMatrix);
+    setVetoes(s.vetoes);
+    setK(s.K);
+    setAlpha(s.alpha);
+    setConvergenceFocus(s.convergenceFocus);
+    setCoherenceThreshold(s.coherenceThreshold);
+    setSeedNames(s.seedNames);
+    setSeedPhases(s.seedPhases);
+    setPurpose(s.purpose);
+    setAudiencePreset(s.audiencePreset);
+    setAudienceCustom(s.audienceCustom);
+    setDocuments(s.documents);
+    setGenerationErrors({});
+  };
+
+  // === Export / Import / Share ===
+  const handleExport = () => {
+    const id = ensureScenarioId();
+    const json = serializeProject(collectState(id));
+    triggerJsonDownload(`${id}.json`, json);
+    setToast({ message: 'Scenario exported.', kind: 'success' });
+  };
+
+  const handleShareOpen = () => {
+    ensureScenarioId();
+    setShareOpen(true);
+  };
+
+  // Mint a new UUID for a fork — used when the user wants a variant of a
+  // published scenario without overwriting the original.
+  const handleDuplicate = () => {
+    const newId = generateUuid();
+    setScenarioId(newId);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', '/');
+    }
+    setToast({ message: 'Forked. New scenario ID assigned.', kind: 'success' });
+  };
+
+  const handleImportClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      // Confirm if the user has done meaningful work (i.e., an existing scenarioId)
+      if (scenarioId) {
+        setImportConfirmFile(file);
+      } else {
+        await runImport(file);
+      }
+    };
+    input.click();
+  };
+
+  const runImport = async (file) => {
+    setImportError(null);
+    try {
+      const parsed = await readJsonFile(file);
+      const result = deserializeProject(parsed);
+      if (!result.ok) {
+        setImportError(result.error);
+        setToast({ message: result.error, kind: 'error' });
+        return;
+      }
+      applyHydratedState(result.state);
+      setStep(10);
+      setToast({ message: 'Scenario imported.', kind: 'success' });
+    } catch (e) {
+      const msg = e.message || 'Could not read file.';
+      setImportError(msg);
+      setToast({ message: msg, kind: 'error' });
+    }
+  };
+
   // === Reset ===
   const handleReset = () => {
     if (!confirm('Reset all data to the AI-and-economy fixture?')) return;
+    setScenarioId(null);
+    setProjectName('');
+    setLoadError(null);
+    if (typeof window !== 'undefined' && parseScenarioPath(window.location.pathname)) {
+      window.history.pushState(null, '', '/');
+    }
     setFactors(DEFAULT_FACTORS);
     setCriteria(DEFAULT_CRITERIA);
     setCriteriaMatrix(DEFAULT_CRITERIA_MATRIX.map(r => [...r]));
@@ -977,7 +1493,7 @@ export default function TUNAScenarioTool() {
     setAudiencePreset('investors');
     setAudienceCustom('');
     setDocuments(DEFAULT_DOCUMENTS.map(d => ({ ...d })));
-    setGeneratedScenarios({}); setGeneratingIdx(null); setGenerationErrors({});
+    setGenerationErrors({});
     setStep(1);
   };
 
@@ -995,16 +1511,16 @@ export default function TUNAScenarioTool() {
       case 7: return <StepStates factorStates={factorStates} setFactorStates={setFactorStates} topFactors={topFactors} stateLabelOverrides={stateLabelOverrides} setStateLabelOverrides={setStateLabelOverrides} />;
       case 8: return <StepCoupling topFactors={topFactors} couplingMatrix={couplingMatrix} setCouplingMatrix={setCouplingMatrix} triggerMatrix={triggerMatrix} setTriggerMatrix={setTriggerMatrix} vetoes={vetoes} setVetoes={setVetoes} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} />;
       case 9: return <StepContext purpose={purpose} setPurpose={setPurpose} audiencePreset={audiencePreset} setAudiencePreset={setAudiencePreset} audienceCustom={audienceCustom} setAudienceCustom={setAudienceCustom} documents={documents} setDocuments={setDocuments} />;
-      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} vetoSurvivors={vetoSurvivors} vetoes={vetoes} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generatedScenarios={generatedScenarios} setGeneratedScenarios={setGeneratedScenarios} generatingIdx={generatingIdx} setGeneratingIdx={setGeneratingIdx} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
+      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} vetoSurvivors={vetoSurvivors} vetoes={vetoes} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
       default: return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-body">
+    <div className="min-h-screen bg-surface-base text-ink-primary font-body">
       <style>{fontStack}</style>
 
-      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
+      <div className="border-b border-surface-border bg-surface-raised/50 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-5">
           <div className={`flex items-center justify-between ${step === 0 ? '' : 'mb-4'}`}>
             <button
@@ -1012,8 +1528,8 @@ export default function TUNAScenarioTool() {
               className="text-left group"
               title="Return to introduction"
             >
-              <h1 className="font-display text-2xl text-slate-50 leading-tight group-hover:text-amber-400 transition">TUNA Scenario Selector</h1>
-              <p className="text-xs font-mono text-slate-500 mt-0.5">
+              <h1 className="font-display text-2xl text-ink-primary leading-tight group-hover:text-brand-fire transition">TUNA Scenario Selector</h1>
+              <p className="text-xs font-mono text-ink-muted mt-0.5">
                 AHP weighting · arrows of time · signed coupling · convergence-driven seed selection
               </p>
             </button>
@@ -1021,15 +1537,36 @@ export default function TUNAScenarioTool() {
               {step > 0 && (
                 <button
                   onClick={() => setStep(0)}
-                  className="text-xs font-mono text-slate-500 hover:text-slate-300 flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
                 >
                   <BookOpen size={12} /> About
                 </button>
               )}
+              <button
+                onClick={handleImportClick}
+                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                title="Import a previously exported scenario JSON"
+              >
+                <Upload size={12} /> Import
+              </button>
+              <button
+                onClick={handleExport}
+                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                title="Export this scenario as JSON"
+              >
+                <Download size={12} /> Export
+              </button>
+              <button
+                onClick={handleShareOpen}
+                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                title="Get a shareable URL for this scenario"
+              >
+                <Share2 size={12} /> Share
+              </button>
               {step > 0 && (
                 <button
                   onClick={handleReset}
-                  className="text-xs font-mono text-slate-500 hover:text-slate-300 flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
+                  className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
                 >
                   <RotateCcw size={12} /> Reset
                 </button>
@@ -1046,20 +1583,20 @@ export default function TUNAScenarioTool() {
                   disabled={s.num > step}
                   className={`
                     flex-1 py-1.5 text-xs font-mono transition relative whitespace-nowrap
-                    ${s.num === step ? 'text-amber-400' : s.num < step ? 'text-slate-400 hover:text-slate-200 cursor-pointer' : 'text-slate-600'}
+                    ${s.num === step ? 'text-brand-fire' : s.num < step ? 'text-ink-secondary hover:text-ink-secondary cursor-pointer' : 'text-ink-muted'}
                   `}
                 >
                   <div className="flex items-center justify-center gap-2">
                     <span className={`
                       w-5 h-5 rounded-full flex items-center justify-center text-[10px] flex-shrink-0
-                      ${s.num === step ? 'bg-amber-500 text-slate-950' : s.num < step ? 'bg-slate-700 text-slate-200' : 'bg-slate-800 text-slate-600'}
+                      ${s.num === step ? 'bg-brand-fire text-surface-base' : s.num < step ? 'bg-surface-border text-ink-secondary' : 'bg-surface-border text-ink-muted'}
                     `}>
                       {s.num < step ? '✓' : s.num}
                     </span>
                     <span className="hidden lg:inline">{s.label}</span>
                   </div>
                 </button>
-                {idx < STEPS.length - 1 && <div className="w-2 h-px bg-slate-800" />}
+                {idx < STEPS.length - 1 && <div className="w-2 h-px bg-surface-border" />}
               </React.Fragment>
             ))}
           </div>
@@ -1068,30 +1605,97 @@ export default function TUNAScenarioTool() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-10 pb-32">
-        {renderStep()}
+        {hydratingFromUrl && (
+          <div className="text-sm font-mono text-ink-muted">Loading scenario…</div>
+        )}
+        {!hydratingFromUrl && step === 0 && loadError && (
+          <div className="mb-8 max-w-3xl border border-signal-press/40 bg-signal-press/10 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle size={18} className="text-signal-press flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-ink-primary">
+              <div className="font-medium mb-1">
+                {loadError.kind === 'not-found' && `Scenario ${loadError.uuid.slice(0, 8)} not found`}
+                {loadError.kind === 'network' && `Couldn't load scenario ${loadError.uuid.slice(0, 8)}`}
+                {loadError.kind === 'format' && `Scenario ${loadError.uuid.slice(0, 8)} is in an unsupported format`}
+              </div>
+              <div className="text-ink-secondary text-xs">
+                {loadError.kind === 'not-found' && 'It may have been removed, or the publisher hasn\'t pushed it yet. The default fixture has been loaded as a fallback.'}
+                {loadError.kind === 'network' && 'Check your connection and refresh. The default fixture has been loaded as a fallback.'}
+                {loadError.kind === 'format' && 'It may have been created by a different version of the tool. The default fixture has been loaded as a fallback.'}
+              </div>
+            </div>
+          </div>
+        )}
+        {!hydratingFromUrl && renderStep()}
       </div>
 
-      <div className="border-t border-slate-800 bg-slate-900/50 backdrop-blur fixed bottom-0 left-0 right-0">
+      <div className="border-t border-surface-border bg-surface-raised/50 backdrop-blur fixed bottom-0 left-0 right-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => setStep(s => Math.max(0, s - 1))}
             disabled={step === 0}
-            className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-2 text-sm font-medium text-ink-secondary hover:text-ink-primary disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             <ChevronLeft size={16} /> Back
           </button>
-          <div className="text-xs font-mono text-slate-600">
+          <div className="text-xs font-mono text-ink-muted">
             {step === 0 ? 'Introduction' : `Step ${step} / ${STEPS.length}`}
           </div>
           <button
             onClick={() => setStep(s => Math.min(STEPS.length, s + 1))}
             disabled={step === STEPS.length || !canProceed[step]}
-            className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-5 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             {step === 0 ? 'Begin' : step === STEPS.length ? 'Done' : 'Continue'} <ChevronRight size={16} />
           </button>
         </div>
       </div>
+
+      {/* Share modal */}
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        scenarioId={scenarioId}
+        projectName={projectName}
+        onProjectNameChange={setProjectName}
+        onDownloadJson={() => { handleExport(); }}
+        onDuplicate={() => { handleDuplicate(); setShareOpen(false); }}
+      />
+
+      {/* Import confirmation modal */}
+      <Modal
+        isOpen={!!importConfirmFile}
+        onClose={() => setImportConfirmFile(null)}
+        title="Replace current scenario?"
+      >
+        <p className="text-sm text-ink-secondary leading-relaxed mb-5">
+          Importing will replace the project you're currently working on. This can't be undone in-app — make sure to Export first if you want to keep it.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setImportConfirmFile(null)}
+            className="px-4 py-2 rounded text-sm font-medium text-ink-secondary hover:text-ink-primary hover:bg-surface-muted transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              const f = importConfirmFile;
+              setImportConfirmFile(null);
+              if (f) await runImport(f);
+            }}
+            className="px-4 py-2 rounded text-sm font-medium bg-brand-fire hover:bg-brand-fire/90 text-ink-inverse transition"
+          >
+            Replace and import
+          </button>
+        </div>
+      </Modal>
+
+      {/* Toast notifications */}
+      <Toast
+        message={toast?.message}
+        kind={toast?.kind}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }
@@ -1167,61 +1771,61 @@ function StepIntro({ onBegin }) {
     <div className="space-y-16 max-w-5xl mx-auto">
       {/* HERO */}
       <section className="space-y-6 pt-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-800 bg-slate-900/50">
-          <Compass size={12} className="text-amber-400" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Strategic scenario generation under deep uncertainty</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-border bg-surface-raised/50">
+          <Compass size={12} className="text-brand-fire" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-ink-secondary">Strategic scenario generation under deep uncertainty</span>
         </div>
-        <h1 className="font-display text-5xl md:text-6xl text-slate-50 leading-[1.05] tracking-tight">
-          Scenario seeds for <span className="text-amber-400">TUNA</span> conditions —
-          <span className="text-slate-400"> structurally distinct, internally coherent, anchored in time.</span>
+        <h1 className="font-display text-5xl md:text-6xl text-ink-primary leading-[1.05] tracking-tight">
+          Scenario seeds for <span className="text-brand-fire">TUNA</span> conditions —
+          <span className="text-ink-secondary"> structurally distinct, internally coherent, anchored in time.</span>
         </h1>
-        <p className="text-lg text-slate-300 leading-relaxed max-w-3xl">
+        <p className="text-lg text-ink-secondary leading-relaxed max-w-3xl">
           A morphological scenario seed generator for futures characterised by
-          <span className="text-slate-100"> Turbulence, Unpredictability, Novelty, and Ambiguity</span>.
+          <span className="text-ink-primary"> Turbulence, Unpredictability, Novelty, and Ambiguity</span>.
           Built to address the structural weaknesses of the standard 2×2 driving-forces method while preserving its strengths: imagination, defensibility, and stakeholder traction.
         </p>
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
             onClick={onBegin}
-            className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-2.5 rounded transition"
+            className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-5 py-2.5 rounded transition"
           >
             Begin <ArrowRight size={16} />
           </button>
-          <span className="text-xs font-mono text-slate-500">10 steps · ~30 minutes · entirely client-side</span>
+          <span className="text-xs font-mono text-ink-muted">10 steps · ~30 minutes · entirely client-side</span>
         </div>
       </section>
 
       {/* PROBLEM */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-amber-500/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400">The problem</span>
+          <div className="w-8 h-px bg-brand-fire/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-brand-fire">The problem</span>
         </div>
-        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+        <h2 className="font-display text-3xl text-ink-primary leading-tight">
           The dominant scenario method has three structural weaknesses.
         </h2>
-        <p className="text-slate-300 leading-relaxed">
+        <p className="text-ink-secondary leading-relaxed">
           The Global Business Network (GBN) intuitive-logics method, codified by Schwartz, Wack, and Ogilvy in the 1980s, has been the consensus practice in corporate strategy for forty years. It produces four scenarios by selecting two high-impact, high-uncertainty driving forces as axes of a 2×2 matrix. The method works — in the sense that it produces scenarios strategists and boards can engage with — but experienced practitioners work around three weaknesses informally.
         </p>
         <div className="grid md:grid-cols-3 gap-4">
-          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-rose-400">Weakness 1</div>
-            <div className="font-display text-lg text-slate-100">Causal entanglement</div>
-            <p className="text-sm text-slate-400 leading-relaxed">
+          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-signal-press">Weakness 1</div>
+            <div className="font-display text-lg text-ink-primary">Causal entanglement</div>
+            <p className="text-sm text-ink-secondary leading-relaxed">
               Two driving forces can both score high on impact and uncertainty but be causally linked, so the four quadrants of the 2×2 collapse into two effective futures — or one.
             </p>
           </div>
-          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-rose-400">Weakness 2</div>
-            <div className="font-display text-lg text-slate-100">Static time</div>
-            <p className="text-sm text-slate-400 leading-relaxed">
+          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-signal-press">Weakness 2</div>
+            <div className="font-display text-lg text-ink-primary">Static time</div>
+            <p className="text-sm text-ink-secondary leading-relaxed">
               Scenarios become spatial configurations rather than transitional moments. In TUNA conditions — complex adaptive systems that bifurcate rather than evolve smoothly — the moments of structural transition are precisely what should be illuminated.
             </p>
           </div>
-          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
-            <div className="text-xs font-mono text-rose-400">Weakness 3</div>
-            <div className="font-display text-lg text-slate-100">Opaque reasoning</div>
-            <p className="text-sm text-slate-400 leading-relaxed">
+          <div className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-signal-press">Weakness 3</div>
+            <div className="font-display text-lg text-ink-primary">Opaque reasoning</div>
+            <p className="text-sm text-ink-secondary leading-relaxed">
               “Why these four scenarios rather than four others?” The conventional answer is “this was our judgement.” Increasingly insufficient for sophisticated audiences expecting reasoning transparency.
             </p>
           </div>
@@ -1231,30 +1835,30 @@ function StepIntro({ onBegin }) {
       {/* METHODOLOGY */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-emerald-500/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">The methodology</span>
+          <div className="w-8 h-px bg-signal-advisory/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-advisory">The methodology</span>
         </div>
-        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+        <h2 className="font-display text-3xl text-ink-primary leading-tight">
           Four traditions integrated into one deterministic pipeline.
         </h2>
-        <p className="text-slate-300 leading-relaxed">
+        <p className="text-ink-secondary leading-relaxed">
           Each step is named, scoped, and tested. The output is a small set of seeds — typically four — that are mathematically distinct, internally coherent, anchored in time, and defended by an auditable chain of judgement.
         </p>
         <div className="grid md:grid-cols-2 gap-4">
           {methods.map((m, i) => {
             const Icon = m.icon;
             return (
-              <div key={i} className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-3">
+              <div key={i} className="border border-surface-border bg-surface-raised/40 rounded-lg p-5 space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
-                    <Icon size={16} className="text-amber-400" />
+                  <div className="w-9 h-9 rounded bg-brand-fire/10 border border-brand-fire/30 flex items-center justify-center flex-shrink-0">
+                    <Icon size={16} className="text-brand-fire" />
                   </div>
                   <div>
-                    <div className="font-display text-lg text-slate-100 leading-tight">{m.name}</div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mt-0.5">{m.attribution}</div>
+                    <div className="font-display text-lg text-ink-primary leading-tight">{m.name}</div>
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-ink-muted mt-0.5">{m.attribution}</div>
                   </div>
                 </div>
-                <p className="text-sm text-slate-400 leading-relaxed">{m.blurb}</p>
+                <p className="text-sm text-ink-secondary leading-relaxed">{m.blurb}</p>
               </div>
             );
           })}
@@ -1264,27 +1868,27 @@ function StepIntro({ onBegin }) {
       {/* WHY IT MATTERS */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-amber-500/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400">Why it matters</span>
+          <div className="w-8 h-px bg-brand-fire/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-brand-fire">Why it matters</span>
         </div>
-        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+        <h2 className="font-display text-3xl text-ink-primary leading-tight">
           Bifurcation, not extrapolation.
         </h2>
-        <div className="grid md:grid-cols-2 gap-6 text-slate-300 leading-relaxed">
+        <div className="grid md:grid-cols-2 gap-6 text-ink-secondary leading-relaxed">
           <div className="space-y-4">
             <p>
-              Emery and Trist (1965) classified organisational environments into four types based on causal interconnection. The fourth — <span className="text-slate-100">turbulent fields</span> — is dynamic, highly interconnected, with changes amplifying through the system in unpredictable ways. Frank Knight (1921) distinguished risk (probabilities knowable, calculable, insurable) from uncertainty (probabilities unknowable, irreducible to mathematics).
+              Emery and Trist (1965) classified organisational environments into four types based on causal interconnection. The fourth — <span className="text-ink-primary">turbulent fields</span> — is dynamic, highly interconnected, with changes amplifying through the system in unpredictable ways. Frank Knight (1921) distinguished risk (probabilities knowable, calculable, insurable) from uncertainty (probabilities unknowable, irreducible to mathematics).
             </p>
             <p>
-              The intersection of turbulent-field dynamics with Knightian uncertainty is what Oxford’s Saïd Business School calls <span className="text-amber-400 font-medium">TUNA conditions</span> — the design target for this tool.
+              The intersection of turbulent-field dynamics with Knightian uncertainty is what Oxford’s Saïd Business School calls <span className="text-brand-fire font-medium">TUNA conditions</span> — the design target for this tool.
             </p>
           </div>
           <div className="space-y-4">
             <p>
-              W. Brian Arthur’s complexity economics provides the structural model. Technologies recombine at exponential rates, producing emergent properties that cannot be predicted from component analysis. Positive feedback drives runaway dynamics rather than equilibrium. Systems accumulate tension until they hit <span className="text-emerald-400 font-medium">bifurcation points</span> and snap into qualitatively new configurations.
+              W. Brian Arthur’s complexity economics provides the structural model. Technologies recombine at exponential rates, producing emergent properties that cannot be predicted from component analysis. Positive feedback drives runaway dynamics rather than equilibrium. Systems accumulate tension until they hit <span className="text-signal-advisory font-medium">bifurcation points</span> and snap into qualitatively new configurations.
             </p>
             <p>
-              The strategist’s task is not to predict which bifurcation will happen but to <span className="text-slate-100">imagine plausible post-bifurcation realities and prepare for them</span>. The convergence-potential metric identifies seeds at exactly those structural transitions.
+              The strategist’s task is not to predict which bifurcation will happen but to <span className="text-ink-primary">imagine plausible post-bifurcation realities and prepare for them</span>. The convergence-potential metric identifies seeds at exactly those structural transitions.
             </p>
           </div>
         </div>
@@ -1293,23 +1897,23 @@ function StepIntro({ onBegin }) {
       {/* WORKFLOW */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-emerald-500/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">The workflow</span>
+          <div className="w-8 h-px bg-signal-advisory/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-advisory">The workflow</span>
         </div>
-        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+        <h2 className="font-display text-3xl text-ink-primary leading-tight">
           Ten steps from candidate factors to named seeds.
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
           {STEPS.map((s, idx) => (
-            <div key={s.num} className="border border-slate-800 bg-slate-900/40 rounded p-3 flex items-center gap-3">
-              <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-[10px] font-mono flex items-center justify-center flex-shrink-0">
+            <div key={s.num} className="border border-surface-border bg-surface-raised/40 rounded p-3 flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-surface-border text-ink-secondary text-[10px] font-mono flex items-center justify-center flex-shrink-0">
                 {s.num}
               </span>
-              <span className="text-sm text-slate-200 truncate">{s.label}</span>
+              <span className="text-sm text-ink-secondary truncate">{s.label}</span>
             </div>
           ))}
         </div>
-        <p className="text-sm text-slate-500 leading-relaxed">
+        <p className="text-sm text-ink-muted leading-relaxed">
           The first five steps weight criteria and factors via AHP. Steps 6–8 set the temporal arrows, state palette, and signed coupling. Step 9 captures the strategic context. Step 10 generates, filters, scores, and selects the seed set — with arrival timeline and parallel-coordinates visualisation.
         </p>
       </section>
@@ -1317,22 +1921,22 @@ function StepIntro({ onBegin }) {
       {/* WHAT IT IS NOT */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-px bg-rose-500/60" />
-          <span className="text-[10px] font-mono uppercase tracking-widest text-rose-400">What this tool is not</span>
+          <div className="w-8 h-px bg-signal-press/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-signal-press">What this tool is not</span>
         </div>
-        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+        <h2 className="font-display text-3xl text-ink-primary leading-tight">
           Knowing the boundary is part of the contract.
         </h2>
-        <p className="text-slate-300 leading-relaxed max-w-3xl">
+        <p className="text-ink-secondary leading-relaxed max-w-3xl">
           A clear scope is what keeps a method useful. The following are deliberately excluded — some belong to adjacent activities, some are out of scope for v1, some are explicitly someone else’s job.
         </p>
         <div className="grid md:grid-cols-2 gap-3">
           {exclusions.map((x, i) => (
-            <div key={i} className="border border-slate-800 bg-slate-900/40 rounded-lg p-4 flex gap-3">
-              <Ban size={16} className="text-rose-400 flex-shrink-0 mt-0.5" />
+            <div key={i} className="border border-surface-border bg-surface-raised/40 rounded-lg p-4 flex gap-3">
+              <Ban size={16} className="text-signal-press flex-shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <div className="text-sm font-medium text-slate-100">{x.title}</div>
-                <p className="text-xs text-slate-400 leading-relaxed">{x.body}</p>
+                <div className="text-sm font-medium text-ink-primary">{x.title}</div>
+                <p className="text-xs text-ink-secondary leading-relaxed">{x.body}</p>
               </div>
             </div>
           ))}
@@ -1340,16 +1944,16 @@ function StepIntro({ onBegin }) {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-slate-800 pt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <section className="border-t border-surface-border pt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
-          <div className="font-display text-xl text-slate-100">Ready to begin.</div>
-          <p className="text-sm text-slate-400">
+          <div className="font-display text-xl text-ink-primary">Ready to begin.</div>
+          <p className="text-sm text-ink-secondary">
             The default fixture is loaded with an AI-and-economy 15-year horizon. Reset to start clean, or work through the steps to produce your seed set.
           </p>
         </div>
         <button
           onClick={onBegin}
-          className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 rounded transition flex-shrink-0"
+          className="flex items-center gap-2 text-sm font-medium bg-brand-fire hover:bg-brand-fire text-surface-base px-6 py-3 rounded transition flex-shrink-0"
         >
           Start the workflow <ArrowRight size={16} />
         </button>
@@ -1376,33 +1980,33 @@ function StepFactors({ factors, setFactors }) {
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 01</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Define your candidate factors</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 01</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Define your candidate factors</h2>
+        <p className="text-ink-secondary max-w-2xl">
           The forces, drivers, and uncertainties shaping the future. Each becomes a dimension in the morphological space — every scenario seed will be a profile across all of them.
         </p>
       </div>
 
       <div className="space-y-2">
         {factors.map((f, idx) => (
-          <div key={f.id} className="group flex items-start gap-3 p-4 bg-slate-900 rounded border border-slate-800 hover:border-slate-700 transition">
-            <div className="text-xs font-mono text-slate-600 w-6 pt-1">{String(idx + 1).padStart(2, '0')}</div>
+          <div key={f.id} className="group flex items-start gap-3 p-4 bg-surface-raised rounded border border-surface-border hover:border-surface-border transition">
+            <div className="text-xs font-mono text-ink-muted w-6 pt-1">{String(idx + 1).padStart(2, '0')}</div>
             <div className="flex-1 space-y-1">
               <input
                 value={f.name}
                 onChange={(e) => setFactors(factors.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                className="bg-transparent text-slate-100 font-medium w-full focus:outline-none focus:text-amber-300 transition"
+                className="bg-transparent text-ink-primary font-medium w-full focus:outline-none focus:text-brand-fire/80 transition"
               />
               <input
                 value={f.description}
                 onChange={(e) => setFactors(factors.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))}
                 placeholder="Brief description"
-                className="bg-transparent text-slate-500 text-sm w-full focus:outline-none focus:text-slate-300 transition"
+                className="bg-transparent text-ink-muted text-sm w-full focus:outline-none focus:text-ink-secondary transition"
               />
             </div>
             <button
               onClick={() => setFactors(factors.filter((_, i) => i !== idx))}
-              className="text-slate-700 hover:text-rose-400 transition opacity-0 group-hover:opacity-100"
+              className="text-surface-border hover:text-signal-press transition opacity-0 group-hover:opacity-100"
             >
               <X size={16} />
             </button>
@@ -1410,26 +2014,26 @@ function StepFactors({ factors, setFactors }) {
         ))}
       </div>
 
-      <div className="p-4 bg-slate-900/50 rounded border border-dashed border-slate-700">
+      <div className="p-4 bg-surface-raised/50 rounded border border-dashed border-surface-border">
         <div className="flex gap-3">
           <input
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addFactor()}
             placeholder="New factor name"
-            className="flex-1 bg-slate-900 text-slate-100 px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none text-sm"
+            className="flex-1 bg-surface-raised text-ink-primary px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none text-sm"
           />
           <input
             value={draftDesc}
             onChange={(e) => setDraftDesc(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addFactor()}
             placeholder="Description (optional)"
-            className="flex-[2] bg-slate-900 text-slate-100 px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none text-sm"
+            className="flex-[2] bg-surface-raised text-ink-primary px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none text-sm"
           />
           <button
             onClick={addFactor}
             disabled={!draftName.trim()}
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded text-sm disabled:opacity-30 transition"
+            className="flex items-center gap-1.5 bg-surface-border hover:bg-surface-border text-ink-secondary px-4 py-2 rounded text-sm disabled:opacity-30 transition"
           >
             <Plus size={14} /> Add
           </button>
@@ -1437,7 +2041,7 @@ function StepFactors({ factors, setFactors }) {
       </div>
 
       {factors.length < 3 && (
-        <div className="flex items-center gap-2 text-amber-400 text-sm">
+        <div className="flex items-center gap-2 text-brand-fire text-sm">
           <AlertCircle size={14} /> Add at least 3 factors to continue
         </div>
       )}
@@ -1463,33 +2067,33 @@ function StepCriteria({ criteria, setCriteria }) {
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 02</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Set your evaluation criteria</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 02</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Set your evaluation criteria</h2>
+        <p className="text-ink-secondary max-w-2xl">
           The lenses through which you'll judge each factor's importance.
         </p>
       </div>
 
       <div className="space-y-2">
         {criteria.map((c, idx) => (
-          <div key={c.id} className="group flex items-start gap-3 p-4 bg-slate-900 rounded border border-slate-800 hover:border-slate-700 transition">
-            <div className="text-xs font-mono text-slate-600 w-6 pt-1">{String(idx + 1).padStart(2, '0')}</div>
+          <div key={c.id} className="group flex items-start gap-3 p-4 bg-surface-raised rounded border border-surface-border hover:border-surface-border transition">
+            <div className="text-xs font-mono text-ink-muted w-6 pt-1">{String(idx + 1).padStart(2, '0')}</div>
             <div className="flex-1 space-y-1">
               <input
                 value={c.name}
                 onChange={(e) => setCriteria(criteria.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                className="bg-transparent text-slate-100 font-medium w-full focus:outline-none focus:text-amber-300 transition"
+                className="bg-transparent text-ink-primary font-medium w-full focus:outline-none focus:text-brand-fire/80 transition"
               />
               <input
                 value={c.description}
                 onChange={(e) => setCriteria(criteria.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))}
                 placeholder="Brief description"
-                className="bg-transparent text-slate-500 text-sm w-full focus:outline-none focus:text-slate-300 transition"
+                className="bg-transparent text-ink-muted text-sm w-full focus:outline-none focus:text-ink-secondary transition"
               />
             </div>
             <button
               onClick={() => setCriteria(criteria.filter((_, i) => i !== idx))}
-              className="text-slate-700 hover:text-rose-400 transition opacity-0 group-hover:opacity-100"
+              className="text-surface-border hover:text-signal-press transition opacity-0 group-hover:opacity-100"
             >
               <X size={16} />
             </button>
@@ -1497,26 +2101,26 @@ function StepCriteria({ criteria, setCriteria }) {
         ))}
       </div>
 
-      <div className="p-4 bg-slate-900/50 rounded border border-dashed border-slate-700">
+      <div className="p-4 bg-surface-raised/50 rounded border border-dashed border-surface-border">
         <div className="flex gap-3">
           <input
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCriterion()}
             placeholder="New criterion name"
-            className="flex-1 bg-slate-900 text-slate-100 px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none text-sm"
+            className="flex-1 bg-surface-raised text-ink-primary px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none text-sm"
           />
           <input
             value={draftDesc}
             onChange={(e) => setDraftDesc(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCriterion()}
             placeholder="Description (optional)"
-            className="flex-[2] bg-slate-900 text-slate-100 px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none text-sm"
+            className="flex-[2] bg-surface-raised text-ink-primary px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none text-sm"
           />
           <button
             onClick={addCriterion}
             disabled={!draftName.trim()}
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded text-sm disabled:opacity-30 transition"
+            className="flex items-center gap-1.5 bg-surface-border hover:bg-surface-border text-ink-secondary px-4 py-2 rounded text-sm disabled:opacity-30 transition"
           >
             <Plus size={14} /> Add
           </button>
@@ -1539,16 +2143,16 @@ function StepWeightCriteria({ criteria, matrix, setMatrix, weights, cr }) {
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 03</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Weight your criteria</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 03</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Weight your criteria</h2>
+        <p className="text-ink-secondary max-w-2xl">
           Saaty 1–9: 1 = equal, 3 = moderate, 5 = strong, 7 = very strong, 9 = extreme.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900 rounded border border-slate-800 p-6">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-4">Pairwise comparisons</div>
+        <div className="lg:col-span-2 bg-surface-raised rounded border border-surface-border p-6">
+          <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-4">Pairwise comparisons</div>
           {pairs.map(([i, j]) => (
             <PairwiseRow
               key={`${i}-${j}`}
@@ -1561,19 +2165,19 @@ function StepWeightCriteria({ criteria, matrix, setMatrix, weights, cr }) {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-slate-900 rounded border border-slate-800 p-5">
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Resulting weights</div>
+          <div className="bg-surface-raised rounded border border-surface-border p-5">
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-3">Resulting weights</div>
             <div className="space-y-2">
               {criteria.map((c, idx) => {
                 const w = weights[idx] || 0;
                 return (
                   <div key={c.id} className="space-y-1">
                     <div className="flex items-baseline justify-between text-sm">
-                      <span className="text-slate-300">{c.name}</span>
-                      <span className="font-mono text-amber-400">{(w * 100).toFixed(1)}%</span>
+                      <span className="text-ink-secondary">{c.name}</span>
+                      <span className="font-mono text-brand-fire">{(w * 100).toFixed(1)}%</span>
                     </div>
-                    <div className="h-1 bg-slate-800 rounded overflow-hidden">
-                      <div className="h-full bg-amber-500/60" style={{ width: `${w * 100}%` }} />
+                    <div className="h-1 bg-surface-border rounded overflow-hidden">
+                      <div className="h-full bg-brand-fire/60" style={{ width: `${w * 100}%` }} />
                     </div>
                   </div>
                 );
@@ -1581,8 +2185,8 @@ function StepWeightCriteria({ criteria, matrix, setMatrix, weights, cr }) {
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded border border-slate-800 p-5">
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Consistency</div>
+          <div className="bg-surface-raised rounded border border-surface-border p-5">
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-3">Consistency</div>
             <ConsistencyBadge cr={cr} />
           </div>
         </div>
@@ -1612,9 +2216,9 @@ function StepScoreFactors({ factors, criteria, matrices, setMatrices, weightsByC
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 04</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Score factors against each criterion</h2>
-        <p className="text-slate-400 max-w-2xl">Switch tabs to work through each lens. Live consistency check per matrix.</p>
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 04</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Score factors against each criterion</h2>
+        <p className="text-ink-secondary max-w-2xl">Switch tabs to work through each lens. Live consistency check per matrix.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -1627,12 +2231,12 @@ function StepScoreFactors({ factors, criteria, matrices, setMatrices, weightsByC
               onClick={() => setActiveCriterionId(c.id)}
               className={`
                 px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2
-                ${active ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 border border-slate-800 hover:border-slate-700'}
+                ${active ? 'bg-brand-fire text-surface-base' : 'bg-surface-raised text-ink-secondary border border-surface-border hover:border-surface-border'}
               `}
             >
               {c.name}
               {!active && (
-                <span className={`text-[10px] font-mono ${cri <= 0.1 ? 'text-emerald-400' : cri <= 0.15 ? 'text-amber-400' : 'text-rose-400'}`}>
+                <span className={`text-[10px] font-mono ${cri <= 0.1 ? 'text-signal-advisory' : cri <= 0.15 ? 'text-brand-fire' : 'text-signal-press'}`}>
                   {(cri * 100).toFixed(0)}%
                 </span>
               )}
@@ -1642,15 +2246,15 @@ function StepScoreFactors({ factors, criteria, matrices, setMatrices, weightsByC
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900 rounded border border-slate-800 p-6">
+        <div className="lg:col-span-2 bg-surface-raised rounded border border-surface-border p-6">
           <div className="mb-4">
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Criterion</div>
-            <div className="font-display text-xl text-slate-100 mt-1">{activeCriterion?.name}</div>
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Criterion</div>
+            <div className="font-display text-xl text-ink-primary mt-1">{activeCriterion?.name}</div>
             {activeCriterion?.description && (
-              <div className="text-sm text-slate-500 mt-1">{activeCriterion.description}</div>
+              <div className="text-sm text-ink-muted mt-1">{activeCriterion.description}</div>
             )}
           </div>
-          <div className="border-t border-slate-800 pt-2">
+          <div className="border-t border-surface-border pt-2">
             {pairs.map(([i, j]) => (
               <PairwiseRow
                 key={`${activeCriterionId}-${i}-${j}`}
@@ -1664,19 +2268,19 @@ function StepScoreFactors({ factors, criteria, matrices, setMatrices, weightsByC
         </div>
 
         <div className="space-y-4">
-          <div className="bg-slate-900 rounded border border-slate-800 p-5">
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Local weights</div>
+          <div className="bg-surface-raised rounded border border-surface-border p-5">
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-3">Local weights</div>
             <div className="space-y-2">
               {factors.map((f, idx) => {
                 const w = weights[idx] || 0;
                 return (
                   <div key={f.id} className="space-y-1">
                     <div className="flex items-baseline justify-between text-sm">
-                      <span className="text-slate-300 truncate">{f.name}</span>
-                      <span className="font-mono text-amber-400 text-xs">{(w * 100).toFixed(1)}%</span>
+                      <span className="text-ink-secondary truncate">{f.name}</span>
+                      <span className="font-mono text-brand-fire text-xs">{(w * 100).toFixed(1)}%</span>
                     </div>
-                    <div className="h-1 bg-slate-800 rounded overflow-hidden">
-                      <div className="h-full bg-amber-500/60" style={{ width: `${w * 100}%` }} />
+                    <div className="h-1 bg-surface-border rounded overflow-hidden">
+                      <div className="h-full bg-brand-fire/60" style={{ width: `${w * 100}%` }} />
                     </div>
                   </div>
                 );
@@ -1684,8 +2288,8 @@ function StepScoreFactors({ factors, criteria, matrices, setMatrices, weightsByC
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded border border-slate-800 p-5">
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Consistency</div>
+          <div className="bg-surface-raised rounded border border-surface-border p-5">
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-3">Consistency</div>
             <ConsistencyBadge cr={cr} />
           </div>
         </div>
@@ -1702,22 +2306,22 @@ function StepSynthesis({ factors, criteria, factorWeightsByCriterion, globalFact
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 05</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Synthesis</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 05</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Synthesis</h2>
+        <p className="text-ink-secondary max-w-2xl">
           Choose how many top-ranked factors to carry forward. Cost grows as |states|<sup>N</sup> seeds.
         </p>
       </div>
 
-      <div className="bg-slate-900 rounded border border-slate-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Ranked factors</div>
+      <div className="bg-surface-raised rounded border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+          <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Ranked factors</div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-mono text-slate-500">Carry forward top</span>
+            <span className="text-xs font-mono text-ink-muted">Carry forward top</span>
             <select
               value={topN}
               onChange={(e) => setTopN(parseInt(e.target.value))}
-              className="bg-slate-800 text-slate-100 px-3 py-1 rounded border border-slate-700 text-sm font-mono focus:outline-none focus:border-amber-500/50"
+              className="bg-surface-border text-ink-primary px-3 py-1 rounded border border-surface-border text-sm font-mono focus:outline-none focus:border-brand-fire/50"
             >
               {Array.from({ length: factors.length - 2 }, (_, i) => i + 3).map(n => (
                 <option key={n} value={n}>{n} factors</option>
@@ -1728,8 +2332,8 @@ function StepSynthesis({ factors, criteria, factorWeightsByCriterion, globalFact
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/50">
-              <tr className="text-xs font-mono text-slate-500 uppercase">
+            <thead className="bg-surface-raised/50">
+              <tr className="text-xs font-mono text-ink-muted uppercase">
                 <th className="px-6 py-3 text-left w-10">#</th>
                 <th className="px-2 py-3 text-left">Factor</th>
                 {criteria.map(c => (
@@ -1744,25 +2348,25 @@ function StepSynthesis({ factors, criteria, factorWeightsByCriterion, globalFact
               {globalFactorWeights.map((row, idx) => {
                 const isTop = idx < topN;
                 return (
-                  <tr key={row.factor.id} className={`border-t border-slate-800 ${isTop ? 'bg-amber-500/5' : ''}`}>
-                    <td className="px-6 py-3 font-mono text-xs text-slate-500">{String(idx + 1).padStart(2, '0')}</td>
+                  <tr key={row.factor.id} className={`border-t border-surface-border ${isTop ? 'bg-brand-fire/5' : ''}`}>
+                    <td className="px-6 py-3 font-mono text-xs text-ink-muted">{String(idx + 1).padStart(2, '0')}</td>
                     <td className="px-2 py-3">
-                      <div className={`font-medium ${isTop ? 'text-amber-300' : 'text-slate-200'}`}>{row.factor.name}</div>
+                      <div className={`font-medium ${isTop ? 'text-brand-fire/80' : 'text-ink-secondary'}`}>{row.factor.name}</div>
                       {row.factor.description && (
-                        <div className="text-xs text-slate-500 mt-0.5">{row.factor.description}</div>
+                        <div className="text-xs text-ink-muted mt-0.5">{row.factor.description}</div>
                       )}
                     </td>
                     {criteria.map(c => {
                       const factorIdx = factors.findIndex(f => f.id === row.factor.id);
                       const localW = factorWeightsByCriterion[c.id]?.[factorIdx] || 0;
                       return (
-                        <td key={c.id} className="px-3 py-3 text-right font-mono text-xs text-slate-500">
+                        <td key={c.id} className="px-3 py-3 text-right font-mono text-xs text-ink-muted">
                           {(localW * 100).toFixed(0)}
                         </td>
                       );
                     })}
                     <td className="px-6 py-3 text-right">
-                      <div className={`font-mono ${isTop ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                      <div className={`font-mono ${isTop ? 'text-brand-fire font-semibold' : 'text-ink-secondary'}`}>
                         {(row.weight * 100).toFixed(1)}%
                       </div>
                     </td>
@@ -1792,31 +2396,31 @@ function StepArrows({ topFactors, factorArrows, setFactorArrows }) {
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 06 · NEW</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Arrows of time</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 06 · NEW</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Arrows of time</h2>
+        <p className="text-ink-secondary max-w-2xl">
           For each top factor, characterise the three Oxford arrows: the contextual future arriving at you (velocity, proximity to threshold), the past catching up with you (path-dependency), and the asymmetry of what arrives. Together these determine which factors are bifurcation candidates.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-2">
-        <div className="bg-slate-900/50 rounded border border-slate-800 p-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-rose-400 uppercase tracking-wider mb-2">
+        <div className="bg-surface-raised/50 rounded border border-surface-border p-4">
+          <div className="flex items-center gap-2 text-xs font-mono text-signal-press uppercase tracking-wider mb-2">
             <Zap size={12} /> Red arrow
           </div>
-          <div className="text-sm text-slate-300">Coming towards you. Velocity & proximity.</div>
+          <div className="text-sm text-ink-secondary">Coming towards you. Velocity & proximity.</div>
         </div>
-        <div className="bg-slate-900/50 rounded border border-slate-800 p-4">
+        <div className="bg-surface-raised/50 rounded border border-surface-border p-4">
           <div className="flex items-center gap-2 text-xs font-mono text-sky-400 uppercase tracking-wider mb-2">
             <Anchor size={12} /> Blue arrow
           </div>
-          <div className="text-sm text-slate-300">Past catching up. Path-dependency load.</div>
+          <div className="text-sm text-ink-secondary">Past catching up. Path-dependency load.</div>
         </div>
-        <div className="bg-slate-900/50 rounded border border-slate-800 p-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 uppercase tracking-wider mb-2">
+        <div className="bg-surface-raised/50 rounded border border-surface-border p-4">
+          <div className="flex items-center gap-2 text-xs font-mono text-signal-advisory uppercase tracking-wider mb-2">
             <Target size={12} /> Asymmetry
           </div>
-          <div className="text-sm text-slate-300">Mostly upside or mostly downside?</div>
+          <div className="text-sm text-ink-secondary">Mostly upside or mostly downside?</div>
         </div>
       </div>
 
@@ -1824,17 +2428,17 @@ function StepArrows({ topFactors, factorArrows, setFactorArrows }) {
         {topFactors.map((tf, idx) => {
           const a = factorArrows[tf.factor.id] || DEFAULT_ARROW;
           const crit = calcCriticality(a);
-          const critColor = crit > 0.5 ? 'text-rose-400 border-rose-500/40 bg-rose-500/10'
-            : crit > 0.3 ? 'text-amber-400 border-amber-500/40 bg-amber-500/10'
-            : 'text-slate-400 border-slate-700 bg-slate-800';
+          const critColor = crit > 0.5 ? 'text-signal-press border-signal-press/40 bg-signal-press/10'
+            : crit > 0.3 ? 'text-brand-fire border-brand-fire/40 bg-brand-fire/10'
+            : 'text-ink-secondary border-surface-border bg-surface-border';
           return (
-            <div key={tf.factor.id} className="bg-slate-900 rounded border border-slate-800 p-5">
+            <div key={tf.factor.id} className="bg-surface-raised rounded border border-surface-border p-5">
               <div className="flex items-baseline justify-between mb-4">
                 <div>
-                  <div className="text-xs font-mono text-slate-600 mb-1">#{idx + 1} · w {(tf.weight * 100).toFixed(1)}%</div>
-                  <div className="font-display text-xl text-slate-100">{tf.factor.name}</div>
+                  <div className="text-xs font-mono text-ink-muted mb-1">#{idx + 1} · w {(tf.weight * 100).toFixed(1)}%</div>
+                  <div className="font-display text-xl text-ink-primary">{tf.factor.name}</div>
                   {tf.factor.description && (
-                    <div className="text-xs text-slate-500 mt-0.5">{tf.factor.description}</div>
+                    <div className="text-xs text-ink-muted mt-0.5">{tf.factor.description}</div>
                   )}
                 </div>
                 <div className={`px-3 py-1.5 rounded border text-xs font-mono ${critColor}`}>
@@ -1874,11 +2478,11 @@ function StepArrows({ topFactors, factorArrows, setFactorArrows }) {
         })}
       </div>
 
-      <div className="bg-slate-900/50 rounded border border-slate-800 p-5">
+      <div className="bg-surface-raised/50 rounded border border-surface-border p-5">
         <div className="flex items-start gap-3">
-          <Info size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-slate-400">
-            <span className="text-slate-200 font-medium">Criticality</span> = velocity × proximity, amplified by path-dependency. Bifurcation happens when high-criticality factors converge — many arrows arriving simultaneously. Factors above 50% criticality drive scenario timing.
+          <Info size={16} className="text-brand-fire mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-ink-secondary">
+            <span className="text-ink-secondary font-medium">Criticality</span> = velocity × proximity, amplified by path-dependency. Bifurcation happens when high-criticality factors converge — many arrows arriving simultaneously. Factors above 50% criticality drive scenario timing.
           </div>
         </div>
       </div>
@@ -1933,73 +2537,73 @@ function StepStates({ factorStates, setFactorStates, topFactors, stateLabelOverr
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 07</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Define factor states</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 07</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Define factor states</h2>
+        <p className="text-ink-secondary max-w-2xl">
           Each top factor takes one state per scenario. Default Low/Mid/High at −1, 0, +1. Override labels per factor for narrative clarity.
         </p>
       </div>
 
-      <div className="bg-slate-900 rounded border border-slate-800 p-6">
+      <div className="bg-surface-raised rounded border border-surface-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Global states</div>
+          <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Global states</div>
           <button
             onClick={addState}
             disabled={factorStates.length >= 5}
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs disabled:opacity-30 transition"
+            className="flex items-center gap-1.5 bg-surface-border hover:bg-surface-border text-ink-secondary px-3 py-1 rounded text-xs disabled:opacity-30 transition"
           >
             <Plus size={12} /> Add state
           </button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {factorStates.map((s, idx) => (
-            <div key={idx} className="bg-slate-950 rounded border border-slate-800 p-3 group relative">
+            <div key={idx} className="bg-surface-base rounded border border-surface-border p-3 group relative">
               <button
                 onClick={() => removeState(idx)}
                 disabled={factorStates.length <= 2}
-                className="absolute top-1 right-1 text-slate-700 hover:text-rose-400 opacity-0 group-hover:opacity-100 disabled:opacity-0 transition"
+                className="absolute top-1 right-1 text-surface-border hover:text-signal-press opacity-0 group-hover:opacity-100 disabled:opacity-0 transition"
               >
                 <X size={12} />
               </button>
               <input
                 value={s.label}
                 onChange={(e) => updateGlobalLabel(idx, e.target.value)}
-                className="bg-transparent text-slate-100 font-medium text-sm w-full focus:outline-none focus:text-amber-300 transition"
+                className="bg-transparent text-ink-primary font-medium text-sm w-full focus:outline-none focus:text-brand-fire/80 transition"
               />
               <input
                 type="number"
                 step="0.5"
                 value={s.value}
                 onChange={(e) => updateGlobalValue(idx, e.target.value)}
-                className="bg-transparent text-slate-500 font-mono text-xs w-full mt-1 focus:outline-none focus:text-amber-400 transition"
+                className="bg-transparent text-ink-muted font-mono text-xs w-full mt-1 focus:outline-none focus:text-brand-fire transition"
               />
             </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-slate-900 rounded border border-slate-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Per-factor label overrides</div>
-          <div className="text-xs text-slate-600 mt-1">Numeric values stay global. Leave blank to use the default.</div>
+      <div className="bg-surface-raised rounded border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border">
+          <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Per-factor label overrides</div>
+          <div className="text-xs text-ink-muted mt-1">Numeric values stay global. Leave blank to use the default.</div>
         </div>
         <table className="w-full">
-          <thead className="bg-slate-900/50">
-            <tr className="text-xs font-mono text-slate-500 uppercase">
+          <thead className="bg-surface-raised/50">
+            <tr className="text-xs font-mono text-ink-muted uppercase">
               <th className="px-6 py-3 text-left">Factor</th>
               {factorStates.map((s, idx) => (
                 <th key={idx} className="px-3 py-3 text-left">
-                  {s.label} <span className="text-slate-700">({s.value})</span>
+                  {s.label} <span className="text-surface-border">({s.value})</span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {topFactors.map((tf) => (
-              <tr key={tf.factor.id} className="border-t border-slate-800">
+              <tr key={tf.factor.id} className="border-t border-surface-border">
                 <td className="px-6 py-3">
-                  <div className="text-slate-200 text-sm font-medium">{tf.factor.name}</div>
-                  <div className="text-xs font-mono text-slate-600">w = {(tf.weight * 100).toFixed(1)}%</div>
+                  <div className="text-ink-secondary text-sm font-medium">{tf.factor.name}</div>
+                  <div className="text-xs font-mono text-ink-muted">w = {(tf.weight * 100).toFixed(1)}%</div>
                 </td>
                 {factorStates.map((s, sIdx) => (
                   <td key={sIdx} className="px-3 py-2">
@@ -2007,7 +2611,7 @@ function StepStates({ factorStates, setFactorStates, topFactors, stateLabelOverr
                       value={stateLabelOverrides[tf.factor.id]?.[sIdx] || ''}
                       onChange={(e) => updateOverride(tf.factor.id, sIdx, e.target.value)}
                       placeholder={s.label}
-                      className="bg-slate-950 text-slate-100 placeholder-slate-700 text-sm px-2 py-1 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none w-full"
+                      className="bg-surface-base text-ink-primary placeholder-surface-border text-sm px-2 py-1 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none w-full"
                     />
                   </td>
                 ))}
@@ -2067,38 +2671,38 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 08 · ENHANCED</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Coupling & triggering chains</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 08 · ENHANCED</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Coupling & triggering chains</h2>
+        <p className="text-ink-secondary max-w-2xl">
           For each pair: the magnitude of coupling, its polarity (reinforcing or damping), and whether either factor triggers the other. Reinforcing coupling creates Arthur's positive-feedback loops — the structural signature of an approaching bifurcation.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-        <div className="bg-slate-900/50 rounded border border-slate-800 p-4">
-          <div className="text-xs font-mono text-emerald-400 uppercase tracking-wider mb-2">Reinforcing (+)</div>
-          <div className="text-sm text-slate-300">Factors move together. Increasing returns. Amplification.</div>
+        <div className="bg-surface-raised/50 rounded border border-surface-border p-4">
+          <div className="text-xs font-mono text-signal-advisory uppercase tracking-wider mb-2">Reinforcing (+)</div>
+          <div className="text-sm text-ink-secondary">Factors move together. Increasing returns. Amplification.</div>
         </div>
-        <div className="bg-slate-900/50 rounded border border-slate-800 p-4">
-          <div className="text-xs font-mono text-rose-400 uppercase tracking-wider mb-2">Damping (−)</div>
-          <div className="text-sm text-slate-300">Factors counteract. Negative feedback. Equilibrium-seeking.</div>
+        <div className="bg-surface-raised/50 rounded border border-surface-border p-4">
+          <div className="text-xs font-mono text-signal-press uppercase tracking-wider mb-2">Damping (−)</div>
+          <div className="text-sm text-ink-secondary">Factors counteract. Negative feedback. Equilibrium-seeking.</div>
         </div>
       </div>
 
-      <div className="bg-slate-900 rounded border border-slate-800 p-6 space-y-6">
+      <div className="bg-surface-raised rounded border border-surface-border p-6 space-y-6">
         {pairs.map(([i, j]) => {
           const v = couplingMatrix[i]?.[j] ?? 0;
           const trigIJ = triggerMatrix[i]?.[j] ?? 0;
           const trigJI = triggerMatrix[j]?.[i] ?? 0;
           return (
-            <div key={`${i}-${j}`} className="space-y-3 pb-6 border-b border-slate-800 last:border-0 last:pb-0">
+            <div key={`${i}-${j}`} className="space-y-3 pb-6 border-b border-surface-border last:border-0 last:pb-0">
               <div className="flex items-baseline justify-between">
                 <div className="flex items-baseline gap-3">
-                  <span className="font-medium text-slate-100">{topFactors[i].factor.name}</span>
-                  <span className="text-slate-600 text-xs font-mono">↔</span>
-                  <span className="font-medium text-slate-100">{topFactors[j].factor.name}</span>
+                  <span className="font-medium text-ink-primary">{topFactors[i].factor.name}</span>
+                  <span className="text-ink-muted text-xs font-mono">↔</span>
+                  <span className="font-medium text-ink-primary">{topFactors[j].factor.name}</span>
                 </div>
-                <span className={`text-xs font-mono ${v > 0 ? 'text-emerald-400' : v < 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+                <span className={`text-xs font-mono ${v > 0 ? 'text-signal-advisory' : v < 0 ? 'text-signal-press' : 'text-ink-muted'}`}>
                   {couplingLabel(v)}
                 </span>
               </div>
@@ -2111,10 +2715,10 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
                     className={`
                       flex-1 py-2 text-xs font-mono rounded transition
                       ${v === n
-                        ? n > 0 ? 'bg-emerald-500 text-slate-950 font-semibold'
-                          : n < 0 ? 'bg-rose-500 text-slate-950 font-semibold'
-                          : 'bg-slate-500 text-slate-950 font-semibold'
-                        : 'bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-200'
+                        ? n > 0 ? 'bg-signal-advisory text-surface-base font-semibold'
+                          : n < 0 ? 'bg-signal-press text-surface-base font-semibold'
+                          : 'bg-ink-muted text-surface-base font-semibold'
+                        : 'bg-surface-border text-ink-muted hover:bg-surface-border hover:text-ink-secondary'
                       }
                     `}
                   >
@@ -2124,12 +2728,12 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
               </div>
 
               <div className="flex items-center gap-3 text-xs">
-                <span className="font-mono text-slate-600 uppercase tracking-wider">Triggers:</span>
+                <span className="font-mono text-ink-muted uppercase tracking-wider">Triggers:</span>
                 <button
                   onClick={() => toggleTrigger(i, j)}
                   className={`
                     flex items-center gap-1.5 px-3 py-1 rounded transition
-                    ${trigIJ ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-500 border border-slate-800 hover:border-slate-700'}
+                    ${trigIJ ? 'bg-brand-fire/20 text-brand-fire/80 border border-brand-fire/40' : 'bg-surface-border text-ink-muted border border-surface-border hover:border-surface-border'}
                   `}
                 >
                   <span>{topFactors[i].factor.name}</span>
@@ -2140,7 +2744,7 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
                   onClick={() => toggleTrigger(j, i)}
                   className={`
                     flex items-center gap-1.5 px-3 py-1 rounded transition
-                    ${trigJI ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-500 border border-slate-800 hover:border-slate-700'}
+                    ${trigJI ? 'bg-brand-fire/20 text-brand-fire/80 border border-brand-fire/40' : 'bg-surface-border text-ink-muted border border-surface-border hover:border-surface-border'}
                   `}
                 >
                   <span>{topFactors[j].factor.name}</span>
@@ -2154,15 +2758,15 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
       </div>
 
       {/* === Hard vetoes === */}
-      <div className="bg-slate-900 rounded-lg border border-rose-500/30 p-6 space-y-4">
+      <div className="bg-surface-raised rounded-lg border border-signal-press/30 p-6 space-y-4">
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <div>
-            <h3 className="font-display text-xl text-slate-50 mb-1">Hard vetoes</h3>
-            <p className="text-sm text-slate-400 max-w-2xl">
+            <h3 className="font-display text-xl text-ink-primary mb-1">Hard vetoes</h3>
+            <p className="text-sm text-ink-secondary max-w-2xl">
               Mark specific factor-state pairs as logically impossible. Any seed containing a vetoed pair is removed before scoring, regardless of how internally coherent the rest of it appears. This catches structural impossibilities that the soft coherence score might otherwise let through.
             </p>
           </div>
-          <span className="text-xs font-mono text-rose-400">
+          <span className="text-xs font-mono text-signal-press">
             {vetoes.size} {vetoes.size === 1 ? 'veto' : 'vetoes'} declared
           </span>
         </div>
@@ -2208,15 +2812,15 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
   return (
     <div className="space-y-4">
       {/* Draft builder */}
-      <div className="bg-slate-950 rounded border border-slate-800 p-4">
-        <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-3">Declare an impossible pair</div>
+      <div className="bg-surface-base rounded border border-surface-border p-4">
+        <div className="text-xs font-mono uppercase tracking-wider text-ink-muted mb-3">Declare an impossible pair</div>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto] gap-3 items-end">
           {/* Left side */}
           <div className="space-y-2">
             <select
               value={draftI}
               onChange={(e) => setDraftI(Number(e.target.value))}
-              className="w-full bg-slate-900 text-slate-100 text-sm px-3 py-2 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+              className="w-full bg-surface-raised text-ink-primary text-sm px-3 py-2 rounded border border-surface-border focus:border-signal-press/50 focus:outline-none"
             >
               {topFactors.map((tf, idx) => (
                 <option key={idx} value={idx}>{tf.factor.name}</option>
@@ -2225,7 +2829,7 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
             <select
               value={draftSa}
               onChange={(e) => setDraftSa(Number(e.target.value))}
-              className="w-full bg-slate-950 text-slate-300 text-xs font-mono px-3 py-1.5 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+              className="w-full bg-surface-base text-ink-secondary text-xs font-mono px-3 py-1.5 rounded border border-surface-border focus:border-signal-press/50 focus:outline-none"
             >
               {factorStates.map((s, idx) => (
                 <option key={idx} value={idx}>{stateLabel(topFactors[draftI]?.factor.id, idx)}</option>
@@ -2235,8 +2839,8 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
 
           {/* Conjunction */}
           <div className="text-center">
-            <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">cannot coexist with</div>
-            <div className="text-rose-400 text-2xl mt-1">⊗</div>
+            <div className="text-xs font-mono text-signal-press uppercase tracking-wider">cannot coexist with</div>
+            <div className="text-signal-press text-2xl mt-1">⊗</div>
           </div>
 
           {/* Right side */}
@@ -2244,7 +2848,7 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
             <select
               value={draftJ}
               onChange={(e) => setDraftJ(Number(e.target.value))}
-              className="w-full bg-slate-900 text-slate-100 text-sm px-3 py-2 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+              className="w-full bg-surface-raised text-ink-primary text-sm px-3 py-2 rounded border border-surface-border focus:border-signal-press/50 focus:outline-none"
             >
               {topFactors.map((tf, idx) => (
                 <option key={idx} value={idx}>{tf.factor.name}</option>
@@ -2253,7 +2857,7 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
             <select
               value={draftSb}
               onChange={(e) => setDraftSb(Number(e.target.value))}
-              className="w-full bg-slate-950 text-slate-300 text-xs font-mono px-3 py-1.5 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+              className="w-full bg-surface-base text-ink-secondary text-xs font-mono px-3 py-1.5 rounded border border-surface-border focus:border-signal-press/50 focus:outline-none"
             >
               {factorStates.map((s, idx) => (
                 <option key={idx} value={idx}>{stateLabel(topFactors[draftJ]?.factor.id, idx)}</option>
@@ -2268,8 +2872,8 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
             className={`
               flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition self-start
               ${draftIsSelfPair || draftAlreadyExists
-                ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40'
+                ? 'bg-surface-border text-ink-muted cursor-not-allowed'
+                : 'bg-signal-press/15 hover:bg-signal-press/25 text-signal-press/80 border border-signal-press/40'
               }
             `}
           >
@@ -2283,10 +2887,10 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
       {declared.length > 0 ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Declared vetoes</div>
+            <div className="text-xs font-mono uppercase tracking-wider text-ink-muted">Declared vetoes</div>
             <button
               onClick={clearAll}
-              className="text-xs font-mono text-slate-500 hover:text-rose-400 transition"
+              className="text-xs font-mono text-ink-muted hover:text-signal-press transition"
             >
               clear all
             </button>
@@ -2297,17 +2901,17 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
               const fj = topFactors[j]?.factor;
               if (!fi || !fj) return null;
               return (
-                <li key={vetoKey(i, sa, j, sb)} className="flex items-center justify-between gap-3 bg-rose-500/5 border border-rose-500/20 rounded px-3 py-2">
+                <li key={vetoKey(i, sa, j, sb)} className="flex items-center justify-between gap-3 bg-signal-press/5 border border-signal-press/20 rounded px-3 py-2">
                   <div className="flex items-baseline gap-2 text-sm flex-1 flex-wrap">
-                    <span className="text-slate-200">{fi.name}</span>
-                    <span className="font-mono text-xs text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded">{stateLabel(fi.id, sa)}</span>
-                    <span className="text-rose-400 font-mono">⊗</span>
-                    <span className="text-slate-200">{fj.name}</span>
-                    <span className="font-mono text-xs text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded">{stateLabel(fj.id, sb)}</span>
+                    <span className="text-ink-secondary">{fi.name}</span>
+                    <span className="font-mono text-xs text-signal-press/80 bg-signal-press/10 px-2 py-0.5 rounded">{stateLabel(fi.id, sa)}</span>
+                    <span className="text-signal-press font-mono">⊗</span>
+                    <span className="text-ink-secondary">{fj.name}</span>
+                    <span className="font-mono text-xs text-signal-press/80 bg-signal-press/10 px-2 py-0.5 rounded">{stateLabel(fj.id, sb)}</span>
                   </div>
                   <button
                     onClick={() => toggleVeto(i, sa, j, sb)}
-                    className="text-slate-600 hover:text-rose-400 transition flex-shrink-0"
+                    className="text-ink-muted hover:text-signal-press transition flex-shrink-0"
                     title="Remove this veto"
                   >
                     <X size={14} />
@@ -2318,7 +2922,7 @@ function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, 
           </ul>
         </div>
       ) : (
-        <div className="text-xs text-slate-500 italic px-1">
+        <div className="text-xs text-ink-muted italic px-1">
           No vetoes declared. The soft coherence score is the only filter.
         </div>
       )}
@@ -2380,33 +2984,33 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 09 · CONTEXT</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Strategic context</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 09 · CONTEXT</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Strategic context</h2>
+        <p className="text-ink-secondary max-w-2xl">
           Tell the AI what these scenarios are for, who will read them, and (optionally) provide documents that ground the narrative in your actual situation. Without context, scenarios read as generic foresight; with it, they're aimed.
         </p>
       </div>
 
       {/* Purpose */}
-      <div className="bg-slate-900 rounded border border-slate-800 p-6">
+      <div className="bg-surface-raised rounded border border-surface-border p-6">
         <div className="flex items-baseline justify-between mb-3">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Purpose</div>
-          <div className="text-xs font-mono text-slate-600">{purpose.length} chars</div>
+          <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Purpose</div>
+          <div className="text-xs font-mono text-ink-muted">{purpose.length} chars</div>
         </div>
         <textarea
           value={purpose}
           onChange={(e) => setPurpose(e.target.value)}
           placeholder="What decision will these scenarios inform? E.g., 'Stress-testing a five-year investment thesis in compliance-tech for the European market', or 'Preparing a 2040 outlook for the board's strategy day on regulatory exposure'."
-          className="w-full bg-slate-950 text-slate-100 placeholder-slate-700 text-sm px-4 py-3 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none min-h-[120px] resize-y leading-relaxed"
+          className="w-full bg-surface-base text-ink-primary placeholder-surface-border text-sm px-4 py-3 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none min-h-[120px] resize-y leading-relaxed"
         />
-        <div className="text-xs text-slate-600 mt-2 leading-relaxed">
+        <div className="text-xs text-ink-muted mt-2 leading-relaxed">
           The AI uses this to focus the strategic implications and avoid generic foresight commentary. Specific is better than general — name the actual decision, the timeframe, and the constraints.
         </div>
       </div>
 
       {/* Audience */}
-      <div className="bg-slate-900 rounded border border-slate-800 p-6">
-        <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Audience</div>
+      <div className="bg-surface-raised rounded border border-surface-border p-6">
+        <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-3">Audience</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           {AUDIENCE_PRESETS.map(p => {
             const active = audiencePreset === p.id;
@@ -2416,8 +3020,8 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
                 onClick={() => setAudiencePreset(p.id)}
                 className={`px-3 py-2 rounded text-sm transition border
                   ${active
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 font-medium'
-                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                    ? 'bg-brand-fire text-surface-base border-brand-fire font-medium'
+                    : 'bg-surface-raised text-ink-secondary border-surface-border hover:border-surface-border'
                   }`}
               >
                 {p.label}
@@ -2430,26 +3034,26 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
             value={audienceCustom}
             onChange={(e) => setAudienceCustom(e.target.value)}
             placeholder="Describe the audience in your own words…"
-            className="w-full bg-slate-950 text-slate-100 placeholder-slate-700 text-sm px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none"
+            className="w-full bg-surface-base text-ink-primary placeholder-surface-border text-sm px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none"
           />
         )}
-        <div className="text-xs text-slate-600 mt-2">
+        <div className="text-xs text-ink-muted mt-2">
           Tunes vocabulary, register, and how methodological the strategic implications get.
         </div>
       </div>
 
       {/* Documents */}
-      <div className="bg-slate-900 rounded border border-slate-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-surface-raised rounded border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">Supporting documents</div>
-            <div className="text-xs text-slate-600 mt-1">
+            <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">Supporting documents</div>
+            <div className="text-xs text-ink-muted mt-1">
               {documents.length === 0
                 ? 'Optional — paste or upload documents that ground the scenario in your situation'
                 : `${includedCount} of ${documents.length} included · ${totalChars.toLocaleString()} chars`}
             </div>
           </div>
-          <label className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs cursor-pointer transition">
+          <label className="flex items-center gap-1.5 bg-surface-border hover:bg-surface-border text-ink-secondary px-3 py-1.5 rounded text-xs cursor-pointer transition">
             <Upload size={12} />
             Upload .txt / .md
             <input
@@ -2463,7 +3067,7 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
         </div>
 
         {documents.length > 0 && (
-          <div className="divide-y divide-slate-800">
+          <div className="divide-y divide-surface-border">
             {documents.map((doc) => (
               <div key={doc.id} className="px-6 py-4 group">
                 <div className="flex items-center gap-3 mb-2">
@@ -2471,23 +3075,23 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
                     onClick={() => toggleInclude(doc.id)}
                     className={`w-5 h-5 rounded flex items-center justify-center transition flex-shrink-0
                       ${doc.included
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'bg-slate-800 border border-slate-700 hover:border-slate-600'
+                        ? 'bg-brand-fire text-surface-base'
+                        : 'bg-surface-border border border-surface-border hover:border-ink-muted'
                       }`}
                     title={doc.included ? 'Included in generation' : 'Excluded from generation'}
                   >
                     {doc.included && <Check size={12} />}
                   </button>
-                  <FileText size={14} className="text-slate-500 flex-shrink-0" />
+                  <FileText size={14} className="text-ink-muted flex-shrink-0" />
                   <input
                     value={doc.name}
                     onChange={(e) => updateDocName(doc.id, e.target.value)}
-                    className="flex-1 bg-transparent text-slate-100 text-sm font-medium focus:outline-none focus:text-amber-300"
+                    className="flex-1 bg-transparent text-ink-primary text-sm font-medium focus:outline-none focus:text-brand-fire/80"
                   />
-                  <span className="text-[10px] font-mono text-slate-600">{(doc.content?.length || 0).toLocaleString()} chars</span>
+                  <span className="text-[10px] font-mono text-ink-muted">{(doc.content?.length || 0).toLocaleString()} chars</span>
                   <button
                     onClick={() => removeDocument(doc.id)}
-                    className="text-slate-700 hover:text-rose-400 transition opacity-0 group-hover:opacity-100"
+                    className="text-surface-border hover:text-signal-press transition opacity-0 group-hover:opacity-100"
                   >
                     <X size={14} />
                   </button>
@@ -2495,31 +3099,31 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
                 <textarea
                   value={doc.content}
                   onChange={(e) => updateDocContent(doc.id, e.target.value)}
-                  className="w-full bg-slate-950 text-slate-300 text-xs px-3 py-2 rounded border border-slate-800 focus:border-amber-500/30 focus:outline-none min-h-[80px] max-h-[240px] resize-y font-mono leading-relaxed"
+                  className="w-full bg-surface-base text-ink-secondary text-xs px-3 py-2 rounded border border-surface-border focus:border-brand-fire/30 focus:outline-none min-h-[80px] max-h-[240px] resize-y font-mono leading-relaxed"
                 />
               </div>
             ))}
           </div>
         )}
 
-        <div className="px-6 py-4 bg-slate-950/40 border-t border-slate-800 space-y-2">
+        <div className="px-6 py-4 bg-surface-base/40 border-t border-surface-border space-y-2">
           <input
             value={draftDocName}
             onChange={(e) => setDraftDocName(e.target.value)}
             placeholder="Document name (e.g., 'Q3 strategy memo', 'Competitive landscape')"
-            className="w-full bg-slate-900 text-slate-100 placeholder-slate-700 text-sm px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none"
+            className="w-full bg-surface-raised text-ink-primary placeholder-surface-border text-sm px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none"
           />
           <textarea
             value={draftDocContent}
             onChange={(e) => setDraftDocContent(e.target.value)}
             placeholder="Paste document content here…"
-            className="w-full bg-slate-900 text-slate-100 placeholder-slate-700 text-xs px-3 py-2 rounded border border-slate-800 focus:border-amber-500/50 focus:outline-none min-h-[80px] resize-y font-mono leading-relaxed"
+            className="w-full bg-surface-raised text-ink-primary placeholder-surface-border text-xs px-3 py-2 rounded border border-surface-border focus:border-brand-fire/50 focus:outline-none min-h-[80px] resize-y font-mono leading-relaxed"
           />
           <div className="flex justify-end">
             <button
               onClick={addDocument}
               disabled={!draftDocName.trim() && !draftDocContent.trim()}
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded text-xs disabled:opacity-30 transition"
+              className="flex items-center gap-1.5 bg-surface-border hover:bg-surface-border text-ink-secondary px-3 py-1.5 rounded text-xs disabled:opacity-30 transition"
             >
               <Plus size={12} /> Add document
             </button>
@@ -2527,11 +3131,11 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
         </div>
       </div>
 
-      <div className="bg-slate-900/50 rounded border border-slate-800 p-5">
+      <div className="bg-surface-raised/50 rounded border border-surface-border p-5">
         <div className="flex items-start gap-3">
-          <Info size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-slate-400">
-            <span className="text-slate-200 font-medium">Documents are sent verbatim to the model</span> when included. Use the checkbox to toggle which documents apply per generation run — you can have a "tech-investor" bundle and a "policy-board" bundle and switch between them. Long documents work fine but inflate prompt size; if you have many or very long documents, consider summarising them first.
+          <Info size={16} className="text-brand-fire mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-ink-secondary">
+            <span className="text-ink-secondary font-medium">Documents are sent verbatim to the model</span> when included. Use the checkbox to toggle which documents apply per generation run — you can have a "tech-investor" bundle and a "policy-board" bundle and switch between them. Long documents work fine but inflate prompt size; if you have many or very long documents, consider summarising them first.
           </div>
         </div>
       </div>
@@ -2543,7 +3147,7 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
 // STEP 10 — SEEDS WITH CONVERGENCE & ARRIVAL
 // ============================================================
 
-function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, vetoSurvivors, vetoes, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generatedScenarios, setGeneratedScenarios, generatingIdx, setGeneratingIdx, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
+function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, vetoSurvivors, vetoes, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
 
   const stateLabel = (factorId, stateIdx) =>
     stateLabelOverrides[factorId]?.[stateIdx] || factorStates[stateIdx]?.label || '';
@@ -2552,9 +3156,9 @@ function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, v
     const v = factorStates[stateIdx]?.value ?? 0;
     const max = Math.max(...factorStates.map(s => Math.abs(s.value))) || 1;
     const norm = v / max;
-    if (norm > 0.33) return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-    if (norm < -0.33) return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
-    return 'bg-slate-700/40 text-slate-300 border-slate-600/40';
+    if (norm > 0.33) return 'bg-signal-advisory/15 text-signal-advisory/80 border-signal-advisory/30';
+    if (norm < -0.33) return 'bg-signal-press/15 text-signal-press/80 border-signal-press/30';
+    return 'bg-surface-border/40 text-ink-secondary border-ink-muted/40';
   };
 
   // ---- AI scenario generation ----
@@ -2671,46 +3275,26 @@ Write the scenario in markdown with the following structure exactly. Use the hea
 Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "Splintered Commons", or whatever fits this seed. Begin your response with the # heading.`;
   };
 
-  const generateScenario = async (idx) => {
-    setGeneratingIdx(idx);
+  // Build the per-seed AI prompt and download as .txt. Replaces an earlier
+  // in-browser fetch to api.anthropic.com which couldn't carry an API key.
+  // The user pastes the .txt into Claude / ChatGPT / their LLM of choice.
+  const generateScenario = (idx) => {
     setGenerationErrors({ ...generationErrors, [idx]: null });
-
     try {
       const prompt = buildPrompt(idx);
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}`);
-      }
-
-      const data = await response.json();
-      const fullText = data.content
-        .map(b => (b.type === 'text' && b.text) ? b.text : '')
-        .filter(Boolean)
-        .join('\n');
-
-      const parsed = parseScenarioMarkdown(fullText);
-      if (!parsed.name) {
-        throw new Error('Could not extract scenario from response');
-      }
-
-      setGeneratedScenarios({ ...generatedScenarios, [idx]: parsed });
-      // If user hasn't named the seed yet, populate from the AI name
-      if (!seedNames[idx] && parsed.name) {
-        setSeedNames({ ...seedNames, [idx]: parsed.name });
-      }
+      const named = seedNames[idx];
+      const slug = named ? named.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `seed-${idx + 1}` : `seed-${idx + 1}`;
+      const blob = new Blob([prompt], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tuna-prompt-${slug}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
-      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Generation failed' });
-    } finally {
-      setGeneratingIdx(null);
+      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Could not build prompt' });
     }
   };
 
@@ -2718,15 +3302,15 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
     return (
       <div className="space-y-6">
         <div>
-          <div className="text-xs font-mono text-amber-400 mb-2">STEP 10</div>
-          <h2 className="font-display text-4xl text-slate-50 mb-3">Seed selection</h2>
+          <div className="text-xs font-mono text-brand-fire mb-2">STEP 10</div>
+          <h2 className="font-display text-4xl text-ink-primary mb-3">Seed selection</h2>
         </div>
-        <div className="bg-rose-500/10 border border-rose-500/30 rounded p-5">
+        <div className="bg-signal-press/10 border border-signal-press/30 rounded p-5">
           <div className="flex items-start gap-3">
-            <AlertCircle size={16} className="text-rose-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-rose-200">
+            <AlertCircle size={16} className="text-signal-press mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-signal-press/40">
               <div className="font-medium mb-1">Seed space too large</div>
-              <div className="text-rose-300/80">
+              <div className="text-signal-press/60">
                 {seedSpace.total.toLocaleString()} candidate seeds exceeds the 200,000 brute-force cap. Reduce factors or states.
               </div>
             </div>
@@ -2741,9 +3325,9 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
   return (
     <div className="space-y-8">
       <div>
-        <div className="text-xs font-mono text-amber-400 mb-2">STEP 10</div>
-        <h2 className="font-display text-4xl text-slate-50 mb-3">Bifurcation pathway seeds</h2>
-        <p className="text-slate-400 max-w-2xl">
+        <div className="text-xs font-mono text-brand-fire mb-2">STEP 10</div>
+        <h2 className="font-display text-4xl text-ink-primary mb-3">Bifurcation pathway seeds</h2>
+        <p className="text-ink-secondary max-w-2xl">
           From the morphological space, K seeds where high-criticality factors converge into structural transitions. Each seed comes with an arrival window and the arrows that are arriving.
         </p>
         <ContextSummary purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />
@@ -2762,7 +3346,7 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
         <StatBox label="Selected" value={selectedSeeds.length} highlight />
       </div>
 
-      <div className="bg-slate-900 rounded border border-slate-800 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="bg-surface-raised rounded border border-surface-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <ControlSlider label="Number of seeds (K)" min={2} max={8} step={1} value={K} onChange={setK} format={v => v} />
         <ControlSlider label="Diversity weight (α)" min={0} max={1} step={0.05} value={alpha} onChange={setAlpha}
           format={v => `${v.toFixed(2)} · ${v < 0.33 ? 'diverse' : v > 0.66 ? 'high-score' : 'balanced'}`} />
@@ -2772,16 +3356,16 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
       </div>
 
       {/* Arrival timeline */}
-      <div className="bg-slate-900 rounded border border-slate-800 p-6">
-        <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+      <div className="bg-surface-raised rounded border border-surface-border p-6">
+        <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-4 flex items-center gap-2">
           <Clock size={12} /> Arrival timeline · estimated years to materialise
         </div>
         <ArrivalTimeline seeds={selectedSeeds} seedNames={seedNames} />
       </div>
 
       {/* Parallel coordinates */}
-      <div className="bg-slate-900 rounded border border-slate-800 p-6">
-        <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-4">Seed profiles</div>
+      <div className="bg-surface-raised rounded border border-surface-border p-6">
+        <div className="text-xs font-mono text-ink-muted uppercase tracking-wider mb-4">Seed profiles</div>
         <ParallelCoords factors={topFactors.map(f => f.factor)} states={factorStates} seeds={selectedSeeds}
           factorWeights={topFactorWeights} criticalities={topCriticalities} />
       </div>
@@ -2792,23 +3376,23 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
           const color = SEED_COLORS[idx % SEED_COLORS.length];
           const phase = seedPhases[idx] || 'pre';
           return (
-            <div key={idx} className="bg-slate-900 rounded border border-slate-800 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-4 flex-wrap"
+            <div key={idx} className="bg-surface-raised rounded border border-surface-border overflow-hidden">
+              <div className="px-6 py-4 border-b border-surface-border flex items-center gap-4 flex-wrap"
                 style={{ borderLeftWidth: 4, borderLeftColor: color, borderLeftStyle: 'solid' }}>
-                <div className="text-xs font-mono text-slate-500">#{idx + 1}</div>
+                <div className="text-xs font-mono text-ink-muted">#{idx + 1}</div>
                 <input
                   value={seedNames[idx] || ''}
                   onChange={(e) => setSeedNames({ ...seedNames, [idx]: e.target.value })}
                   placeholder="Name this seed…"
-                  className="flex-1 bg-transparent text-slate-100 font-display text-xl placeholder-slate-700 focus:outline-none focus:text-amber-300 transition min-w-[200px]"
+                  className="flex-1 bg-transparent text-ink-primary font-display text-xl placeholder-surface-border focus:outline-none focus:text-brand-fire/80 transition min-w-[200px]"
                 />
-                <div className="flex items-center gap-1 bg-slate-950 rounded p-0.5 border border-slate-800">
+                <div className="flex items-center gap-1 bg-surface-base rounded p-0.5 border border-surface-border">
                   {['pre', 'mid', 'post', 'steady'].map(p => (
                     <button
                       key={p}
                       onClick={() => setSeedPhases({ ...seedPhases, [idx]: p })}
                       className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider rounded transition
-                        ${phase === p ? 'bg-amber-500 text-slate-950' : 'text-slate-500 hover:text-slate-200'}`}
+                        ${phase === p ? 'bg-brand-fire text-surface-base' : 'text-ink-muted hover:text-ink-secondary'}`}
                     >
                       {p}
                     </button>
@@ -2823,19 +3407,19 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
               </div>
 
               {/* Arrival info */}
-              <div className="px-6 py-3 bg-slate-900/50 border-b border-slate-800 flex items-center gap-4 flex-wrap">
-                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="px-6 py-3 bg-surface-raised/50 border-b border-surface-border flex items-center gap-4 flex-wrap">
+                <div className="text-xs font-mono text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
                   <Clock size={11} />
                   Arrival: {s.arrival.median.toFixed(1)}y
                 </div>
-                <div className="text-xs font-mono text-slate-600">
+                <div className="text-xs font-mono text-ink-muted">
                   window {s.arrival.min.toFixed(1)}–{s.arrival.max.toFixed(1)}y
                 </div>
                 {s.arrival.arriving.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-slate-600 uppercase tracking-wider">Arrows arriving:</span>
+                    <span className="text-xs font-mono text-ink-muted uppercase tracking-wider">Arrows arriving:</span>
                     {s.arrival.arriving.slice(0, 4).map((a, i) => (
-                      <span key={i} className="text-xs font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/30">
+                      <span key={i} className="text-xs font-mono px-2 py-0.5 rounded bg-signal-press/10 text-signal-press/80 border border-signal-press/30">
                         {a.factor.name} ({a.years.toFixed(1)}y)
                       </span>
                     ))}
@@ -2852,7 +3436,7 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
                     <div key={tf.factor.id} className={`px-3 py-2 rounded border ${stateColor(stateIdx)} relative`}>
                       <div className="text-[10px] font-mono uppercase tracking-wider opacity-60 flex items-center gap-1">
                         {tf.factor.name}
-                        {crit > 0.5 && <Zap size={9} className="text-rose-400" />}
+                        {crit > 0.5 && <Zap size={9} className="text-signal-press" />}
                       </div>
                       <div className="text-sm font-medium mt-0.5">{label}</div>
                     </div>
@@ -2860,25 +3444,22 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
                 })}
               </div>
 
-              {/* AI Generation Panel */}
+              {/* AI Prompt Download */}
               <AIScenarioPanel
                 seedIdx={idx}
-                color={color}
-                generatedScenarios={generatedScenarios}
-                generatingIdx={generatingIdx}
-                generationErrors={generationErrors}
-                onGenerate={() => generateScenario(idx)}
+                error={generationErrors[idx]}
+                onDownload={() => generateScenario(idx)}
               />
             </div>
           );
         })}
       </div>
 
-      <div className="bg-slate-900/50 rounded border border-slate-800 p-5">
+      <div className="bg-surface-raised/50 rounded border border-surface-border p-5">
         <div className="flex items-start gap-3">
-          <Sparkles size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-slate-400">
-            <span className="text-slate-200 font-medium">Bifurcation phase tags</span> let you distinguish pre-bifurcation seeds (system tense, factors approaching threshold) from post-bifurcation seeds (system has snapped, new emergent properties). Steady-state seeds are non-transitional configurations. The narrative for each phase asks different questions.
+          <Sparkles size={16} className="text-brand-fire mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-ink-secondary">
+            <span className="text-ink-secondary font-medium">Bifurcation phase tags</span> let you distinguish pre-bifurcation seeds (system tense, factors approaching threshold) from post-bifurcation seeds (system has snapped, new emergent properties). Steady-state seeds are non-transitional configurations. The narrative for each phase asks different questions.
           </div>
         </div>
       </div>
@@ -2886,148 +3467,25 @@ Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "S
   );
 }
 
-function AIScenarioPanel({ seedIdx, color, generatedScenarios, generatingIdx, generationErrors, onGenerate }) {
-  const scenario = generatedScenarios[seedIdx];
-  const isGenerating = generatingIdx === seedIdx;
-  const error = generationErrors[seedIdx];
-  const isOtherGenerating = generatingIdx !== null && generatingIdx !== seedIdx;
-
-  if (isGenerating) {
-    return (
-      <div className="px-6 py-5 border-t border-slate-800 bg-slate-950/50">
-        <div className="flex items-center gap-3 text-amber-300">
-          <Loader2 size={16} className="animate-spin" />
-          <div className="text-sm font-mono">Generating scenario from seed parameters…</div>
-        </div>
-        <div className="text-xs text-slate-600 mt-2 ml-7">Sending factors, weights, criticalities, coupling, and arrival timing to the model.</div>
-      </div>
-    );
-  }
-
-  if (!scenario) {
-    return (
-      <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
-        <div className="text-xs text-slate-500">
-          {error ? (
-            <span className="text-rose-400">Generation failed: {error}</span>
-          ) : (
-            <span>No narrative yet. The seed parameters above can be expanded into a full scenario.</span>
-          )}
-        </div>
-        <button
-          onClick={onGenerate}
-          disabled={isOtherGenerating}
-          className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition
-            ${isOtherGenerating
-              ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-              : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40'
-            }`}
-        >
-          <Wand2 size={14} />
-          {error ? 'Try again' : 'Generate with AI'}
-        </button>
-      </div>
-    );
-  }
-
-  // Scenario rendered
+function AIScenarioPanel({ error, onDownload }) {
   return (
-    <div className="border-t border-slate-800 bg-slate-950/40">
-      <div className="px-6 py-5 space-y-5">
-        <div className="flex items-baseline justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color }}>AI-generated scenario</div>
-            <div className="font-display text-2xl text-slate-50 leading-tight">{scenario.name}</div>
-            {scenario.tagline && (
-              <div className="text-sm text-slate-400 italic mt-1">{scenario.tagline}</div>
-            )}
-          </div>
-          <button
-            onClick={onGenerate}
-            disabled={isOtherGenerating}
-            className="flex items-center gap-1.5 text-xs font-mono text-slate-500 hover:text-amber-300 transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={11} /> regenerate
-          </button>
-        </div>
-
-        {scenario.narrative && (
-          <MarkdownProse text={scenario.narrative} />
-        )}
-
-        {scenario.tension && (
-          <div className="border-l-2 pl-4 py-1" style={{ borderColor: color }}>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Structural tension</div>
-            <MarkdownProse text={scenario.tension} />
-          </div>
-        )}
-
-        {Array.isArray(scenario.signals) && scenario.signals.length > 0 && (
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">Observable signals</div>
-            <ul className="space-y-1.5">
-              {scenario.signals.map((sig, i) => (
-                <li key={i} className="text-sm text-slate-300 flex gap-2">
-                  <span className="text-slate-600 font-mono text-xs flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
-                  <span>{renderInlineMarkdown(sig)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {scenario.implications && (
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Strategic implications</div>
-            <MarkdownProse text={scenario.implications} />
-          </div>
+    <div className="px-6 py-4 border-t border-surface-border flex items-center justify-between gap-4 flex-wrap">
+      <div className="text-xs text-ink-muted">
+        {error ? (
+          <span className="text-signal-press">Couldn't build prompt: {error}</span>
+        ) : (
+          <span>The seed parameters above can be expanded into a full scenario by an LLM. Download the prompt and paste it into Claude, ChatGPT, or any model.</span>
         )}
       </div>
+      <button
+        onClick={onDownload}
+        className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition bg-brand-fire/15 hover:bg-brand-fire/25 text-brand-fire border border-brand-fire/40"
+      >
+        <Download size={14} />
+        {error ? 'Try again' : 'Download AI prompt'}
+      </button>
     </div>
   );
-}
-
-// Render markdown prose — paragraphs separated by blank lines, with inline bold/italic.
-function MarkdownProse({ text }) {
-  if (!text) return null;
-  const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-  return (
-    <div className="text-sm text-slate-300 leading-relaxed space-y-3">
-      {paragraphs.map((p, i) => (
-        <p key={i}>{renderInlineMarkdown(p)}</p>
-      ))}
-    </div>
-  );
-}
-
-// Inline markdown: **bold**, *italic*, _italic_. Returns React fragments.
-function renderInlineMarkdown(text) {
-  if (!text) return null;
-  // Tokenise on the markers we care about.
-  // We do this in two passes: bold first, then italic, since ** must not be split as *.
-  const parts = [];
-  const regex = /(\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
-  let lastIdx = 0;
-  let match;
-  let key = 0;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push(text.slice(lastIdx, match.index));
-    }
-    const token = match[0];
-    if (token.startsWith('**') && token.endsWith('**')) {
-      parts.push(<strong key={key++} className="font-semibold text-slate-100">{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith('*') && token.endsWith('*')) {
-      parts.push(<em key={key++} className="italic">{token.slice(1, -1)}</em>);
-    } else if (token.startsWith('_') && token.endsWith('_')) {
-      parts.push(<em key={key++} className="italic">{token.slice(1, -1)}</em>);
-    }
-    lastIdx = match.index + token.length;
-  }
-  if (lastIdx < text.length) {
-    parts.push(text.slice(lastIdx));
-  }
-  return parts.length > 0 ? parts : text;
 }
 
 function ContextSummary({ purpose, audiencePreset, audienceCustom, documents }) {
@@ -3040,7 +3498,7 @@ function ContextSummary({ purpose, audiencePreset, audienceCustom, documents }) 
 
   if (!hasContext) {
     return (
-      <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono bg-slate-900 border border-slate-800 text-slate-500">
+      <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono bg-surface-raised border border-surface-border text-ink-muted">
         <Info size={11} /> No strategic context set — scenarios will be generic. Add purpose & audience in Step 9 for aimed narratives.
       </div>
     );
@@ -3048,19 +3506,19 @@ function ContextSummary({ purpose, audiencePreset, audienceCustom, documents }) 
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-2">
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-amber-500/10 border border-amber-500/30 text-amber-300">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-brand-fire/10 border border-brand-fire/30 text-brand-fire/80">
         <Check size={11} /> Context active
       </span>
       {hasPurpose && (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-slate-900 border border-slate-800 text-slate-400">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-surface-raised border border-surface-border text-ink-secondary">
           purpose · {purpose.length} chars
         </span>
       )}
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-slate-900 border border-slate-800 text-slate-400">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-surface-raised border border-surface-border text-ink-secondary">
         audience · {audienceLabel}
       </span>
       {includedDocs.length > 0 && (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-slate-900 border border-slate-800 text-slate-400">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono bg-surface-raised border border-surface-border text-ink-secondary">
           <FileText size={11} /> {includedDocs.length} doc{includedDocs.length !== 1 ? 's' : ''}
         </span>
       )}
@@ -3070,9 +3528,9 @@ function ContextSummary({ purpose, audiencePreset, audienceCustom, documents }) 
 
 function StatBox({ label, value, highlight }) {
   return (
-    <div className={`p-4 rounded border ${highlight ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900 border-slate-800'}`}>
-      <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">{label}</div>
-      <div className={`font-mono text-2xl mt-1 ${highlight ? 'text-amber-400' : 'text-slate-100'}`}>{value}</div>
+    <div className={`p-4 rounded border ${highlight ? 'bg-brand-fire/10 border-brand-fire/30' : 'bg-surface-raised border-surface-border'}`}>
+      <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">{label}</div>
+      <div className={`font-mono text-2xl mt-1 ${highlight ? 'text-brand-fire' : 'text-ink-primary'}`}>{value}</div>
     </div>
   );
 }
@@ -3081,11 +3539,11 @@ function ControlSlider({ label, min, max, step, value, onChange, format }) {
   return (
     <div>
       <div className="flex items-baseline justify-between mb-2">
-        <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">{label}</div>
-        <div className="text-sm font-mono text-amber-400">{format(value)}</div>
+        <div className="text-xs font-mono text-ink-muted uppercase tracking-wider">{label}</div>
+        <div className="text-sm font-mono text-brand-fire">{format(value)}</div>
       </div>
       <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))} className="w-full accent-amber-500" />
+        onChange={(e) => onChange(parseFloat(e.target.value))} className="w-full accent-brand-fire" />
     </div>
   );
 }
@@ -3093,8 +3551,8 @@ function ControlSlider({ label, min, max, step, value, onChange, format }) {
 function Metric({ label, value, highlight }) {
   return (
     <div className="text-center">
-      <div className="text-[9px] uppercase tracking-wider text-slate-600">{label}</div>
-      <div className={highlight ? 'text-amber-400 font-semibold' : 'text-slate-300'}>
+      <div className="text-[9px] uppercase tracking-wider text-ink-muted">{label}</div>
+      <div className={highlight ? 'text-brand-fire font-semibold' : 'text-ink-secondary'}>
         {(value * 100).toFixed(0)}
       </div>
     </div>
@@ -3124,7 +3582,7 @@ function ArrivalTimeline({ seeds, seedNames }) {
         return (
           <g key={y}>
             <line x1={x} y1={height - padding.bottom} x2={x} y2={height - padding.bottom + 4} stroke="#475569" />
-            <text x={x} y={height - padding.bottom + 16} fill="#64748b" fontSize="10" textAnchor="middle" fontFamily="JetBrains Mono">
+            <text x={x} y={height - padding.bottom + 16} fill="#6a6a74" fontSize="10" textAnchor="middle" fontFamily="Noto Sans Mono">
               {y === 0 ? 'now' : `+${y}y`}
             </text>
           </g>
@@ -3132,10 +3590,10 @@ function ArrivalTimeline({ seeds, seedNames }) {
       })}
 
       {/* "Today" marker */}
-      <text x={padding.left - 8} y={height - padding.bottom + 4} fill="#94a3b8" fontSize="10" textAnchor="end" fontFamily="JetBrains Mono">
+      <text x={padding.left - 8} y={height - padding.bottom + 4} fill="#a8a8b3" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
         2026
       </text>
-      <text x={padding.left + innerWidth + 8} y={height - padding.bottom + 4} fill="#94a3b8" fontSize="10" textAnchor="start" fontFamily="JetBrains Mono">
+      <text x={padding.left + innerWidth + 8} y={height - padding.bottom + 4} fill="#a8a8b3" fontSize="10" textAnchor="start" fontFamily="Noto Sans Mono">
         2041
       </text>
 
@@ -3153,7 +3611,7 @@ function ArrivalTimeline({ seeds, seedNames }) {
             {/* Median dot */}
             <circle cx={xMed} cy={yPos} r={5} fill={color} stroke="#0f172a" strokeWidth={1.5} />
             {/* Label */}
-            <text x={padding.left - 8} y={yPos + 4} fill="#cbd5e1" fontSize="11" textAnchor="end" fontFamily="JetBrains Mono">
+            <text x={padding.left - 8} y={yPos + 4} fill="#a8a8b3" fontSize="11" textAnchor="end" fontFamily="Noto Sans Mono">
               #{idx + 1} {seedNames[idx] ? seedNames[idx].slice(0, 12) : ''}
             </text>
           </g>
@@ -3190,22 +3648,22 @@ function ParallelCoords({ factors, states, seeds, factorWeights, criticalities }
               stroke={axisColor} strokeWidth={crit > 0.5 ? 1.5 : 1} opacity={crit > 0.3 ? 0.8 : 0.5} />
             {states.map((s, si) => (
               <g key={si}>
-                <circle cx={xScale(i)} cy={yScale(s.value)} r={2.5} fill="#475569" />
+                <circle cx={xScale(i)} cy={yScale(s.value)} r={2.5} fill="#6a6a74" />
                 {i === 0 && (
-                  <text x={xScale(i) - 10} y={yScale(s.value) + 4} fill="#64748b" fontSize="10" textAnchor="end" fontFamily="JetBrains Mono">
+                  <text x={xScale(i) - 10} y={yScale(s.value) + 4} fill="#6a6a74" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
                     {s.label}
                   </text>
                 )}
               </g>
             ))}
-            <text x={xScale(i)} y={padding.top + innerHeight + 22} fill="#cbd5e1" fontSize="11" textAnchor="middle" fontFamily="IBM Plex Sans" fontWeight="500">
+            <text x={xScale(i)} y={padding.top + innerHeight + 22} fill="#a8a8b3" fontSize="11" textAnchor="middle" fontFamily="Inter" fontWeight="500">
               {f.name.length > 14 ? f.name.slice(0, 13) + '…' : f.name}
             </text>
-            <text x={xScale(i)} y={padding.top + innerHeight + 38} fill="#64748b" fontSize="9" textAnchor="middle" fontFamily="JetBrains Mono">
+            <text x={xScale(i)} y={padding.top + innerHeight + 38} fill="#6a6a74" fontSize="9" textAnchor="middle" fontFamily="Noto Sans Mono">
               w {(factorWeights[i] * 100).toFixed(0)}%
             </text>
             <text x={xScale(i)} y={padding.top + innerHeight + 52} fill={crit > 0.5 ? '#fb7185' : crit > 0.3 ? '#fbbf24' : '#475569'}
-              fontSize="9" textAnchor="middle" fontFamily="JetBrains Mono">
+              fontSize="9" textAnchor="middle" fontFamily="Noto Sans Mono">
               c {(crit * 100).toFixed(0)}
             </text>
           </g>
@@ -3232,7 +3690,7 @@ function ParallelCoords({ factors, states, seeds, factorWeights, criticalities }
         {seeds.map((s, idx) => (
           <g key={idx} transform={`translate(${idx * 70}, 0)`}>
             <rect x={0} y={-8} width={10} height={3} fill={SEED_COLORS[idx % SEED_COLORS.length]} />
-            <text x={14} y={-3} fill="#94a3b8" fontSize="10" fontFamily="JetBrains Mono">#{idx + 1}</text>
+            <text x={14} y={-3} fill="#a8a8b3" fontSize="10" fontFamily="Noto Sans Mono">#{idx + 1}</text>
           </g>
         ))}
       </g>
