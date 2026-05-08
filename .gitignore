@@ -8,3 +8,6 @@ dist
 !.env.example
 .vite
 .vercel
+
+# Brand assets — large binaries kept out of git (reference only)
+_brief/Brand-GuidelinesV4.pdf
