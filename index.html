@@ -9,10 +9,21 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <title>TUNA Scenario Selector — Peter Verster</title>
+    <title>TUNA Scenario Finder — Peter Verster</title>
     <meta name="description" content="A morphological scenario seed generator for futures characterised by Turbulence, Unpredictability, Novelty, and Ambiguity." />
+    <script>
+      // Apply theme before paint to prevent flash of wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem('tuna-theme') || 'dark';
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-surface-base text-ink-primary">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

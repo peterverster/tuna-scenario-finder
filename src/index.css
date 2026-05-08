@@ -2,6 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens — RGB triplets so Tailwind's <alpha-value> opacity modifiers work. */
+:root,
+[data-theme="dark"] {
+  --surface-base: 26 26 32;
+  --surface-raised: 46 46 54;
+  --surface-muted: 38 38 45;
+  --surface-border: 58 58 68;
+
+  --ink-primary: 240 240 240;
+  --ink-secondary: 168 168 179;
+  --ink-muted: 106 106 116;
+  --ink-inverse: 26 26 32;
+
+  --brand-fire: 255 58 5;
+  --brand-slate: 46 46 54;
+  --brand-dark: 220 220 220;
+  --brand-light: 240 240 240;
+
+  --signal-thought: 240 194 46;
+  --signal-advisory: 75 152 117;
+  --signal-speaking: 131 113 220;
+  --signal-book: 118 177 210;
+  --signal-press: 244 122 73;
+}
+
+/* Light theme — brand Light Grey ground, white raised cards, darker accents
+   so colour readouts (CR badges, signal pills) keep their semantic punch. */
+[data-theme="light"] {
+  --surface-base: 240 240 240;     /* brand Light Grey */
+  --surface-raised: 255 255 255;   /* pure white cards */
+  --surface-muted: 247 247 248;    /* near-white nested */
+  --surface-border: 215 215 220;   /* hairlines */
+
+  --ink-primary: 26 26 32;         /* near-black */
+  --ink-secondary: 92 92 104;
+  --ink-muted: 130 130 140;
+  --ink-inverse: 240 240 240;      /* light text on Fire buttons */
+
+  --brand-fire: 230 50 0;          /* slightly deeper Fire for legibility on light */
+  --brand-slate: 46 46 54;
+  --brand-dark: 80 80 90;
+  --brand-light: 240 240 240;
+
+  /* Signals adjusted for ≥4.5:1 contrast on white. */
+  --signal-thought: 175 130 0;     /* darker amber */
+  --signal-advisory: 38 110 75;    /* darker green */
+  --signal-speaking: 91 80 174;    /* darker purple */
+  --signal-book: 56 124 165;       /* darker blue */
+  --signal-press: 200 92 40;       /* darker terracotta */
+}
+
 html,
 body,
 #root {
@@ -15,4 +66,7 @@ body {
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: rgb(var(--surface-base));
+  color: rgb(var(--ink-primary));
+  transition: background-color 200ms ease, color 200ms ease;
 }

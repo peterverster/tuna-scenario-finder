@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Download, Upload, Check, BookOpen, Compass, Layers, Activity, Ban, FileText, Share2, Copy, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Download, Upload, Check, BookOpen, Compass, Layers, Activity, Ban, FileText, Share2, Copy, AlertTriangle, Sun, Moon } from 'lucide-react';
 
 // ============================================================
 // CONSTANTS
@@ -1121,6 +1121,17 @@ function Toast({ message, kind = 'info', onClose }) {
 
 export default function TUNAScenarioTool() {
   const [step, setStep] = useState(0);
+  // Theme — persisted in localStorage; defaults to dark; written to <html data-theme>.
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return window.localStorage.getItem('tuna-theme') || 'dark';
+  });
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', theme);
+    window.localStorage.setItem('tuna-theme', theme);
+  }, [theme]);
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
   // Project identity — UUID generated lazily on first export/share; persists across imports.
   const [scenarioId, setScenarioId] = useState(null);
   const [projectName, setProjectName] = useState('');
@@ -1528,9 +1539,9 @@ export default function TUNAScenarioTool() {
               className="text-left group"
               title="Return to introduction"
             >
-              <h1 className="font-display text-2xl text-ink-primary leading-tight group-hover:text-brand-fire transition">TUNA Scenario Selector</h1>
+              <h1 className="font-display text-2xl text-ink-primary leading-tight group-hover:text-brand-fire transition">TUNA Scenario Finder</h1>
               <p className="text-xs font-mono text-ink-muted mt-0.5">
-                AHP weighting · arrows of time · signed coupling · convergence-driven seed selection
+                <span className="text-ink-secondary font-semibold">T</span>urbulent · <span className="text-ink-secondary font-semibold">U</span>npredictable · <span className="text-ink-secondary font-semibold">N</span>ovel · <span className="text-ink-secondary font-semibold">A</span>mbiguous
               </p>
             </button>
             <div className="flex items-center gap-2">
@@ -1542,6 +1553,14 @@ export default function TUNAScenarioTool() {
                   <BookOpen size={12} /> About
                 </button>
               )}
+              <button
+                onClick={toggleTheme}
+                className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
+                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              >
+                {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+              </button>
               <button
                 onClick={handleImportClick}
                 className="text-xs font-mono text-ink-muted hover:text-ink-secondary flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border hover:border-surface-border transition"
@@ -3582,7 +3601,7 @@ function ArrivalTimeline({ seeds, seedNames }) {
         return (
           <g key={y}>
             <line x1={x} y1={height - padding.bottom} x2={x} y2={height - padding.bottom + 4} stroke="#475569" />
-            <text x={x} y={height - padding.bottom + 16} fill="#6a6a74" fontSize="10" textAnchor="middle" fontFamily="Noto Sans Mono">
+            <text x={x} y={height - padding.bottom + 16} className="fill-ink-muted" fontSize="10" textAnchor="middle" fontFamily="Noto Sans Mono">
               {y === 0 ? 'now' : `+${y}y`}
             </text>
           </g>
@@ -3590,10 +3609,10 @@ function ArrivalTimeline({ seeds, seedNames }) {
       })}
 
       {/* "Today" marker */}
-      <text x={padding.left - 8} y={height - padding.bottom + 4} fill="#a8a8b3" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
+      <text x={padding.left - 8} y={height - padding.bottom + 4} className="fill-ink-secondary" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
         2026
       </text>
-      <text x={padding.left + innerWidth + 8} y={height - padding.bottom + 4} fill="#a8a8b3" fontSize="10" textAnchor="start" fontFamily="Noto Sans Mono">
+      <text x={padding.left + innerWidth + 8} y={height - padding.bottom + 4} className="fill-ink-secondary" fontSize="10" textAnchor="start" fontFamily="Noto Sans Mono">
         2041
       </text>
 
@@ -3611,7 +3630,7 @@ function ArrivalTimeline({ seeds, seedNames }) {
             {/* Median dot */}
             <circle cx={xMed} cy={yPos} r={5} fill={color} stroke="#0f172a" strokeWidth={1.5} />
             {/* Label */}
-            <text x={padding.left - 8} y={yPos + 4} fill="#a8a8b3" fontSize="11" textAnchor="end" fontFamily="Noto Sans Mono">
+            <text x={padding.left - 8} y={yPos + 4} className="fill-ink-secondary" fontSize="11" textAnchor="end" fontFamily="Noto Sans Mono">
               #{idx + 1} {seedNames[idx] ? seedNames[idx].slice(0, 12) : ''}
             </text>
           </g>
@@ -3648,18 +3667,18 @@ function ParallelCoords({ factors, states, seeds, factorWeights, criticalities }
               stroke={axisColor} strokeWidth={crit > 0.5 ? 1.5 : 1} opacity={crit > 0.3 ? 0.8 : 0.5} />
             {states.map((s, si) => (
               <g key={si}>
-                <circle cx={xScale(i)} cy={yScale(s.value)} r={2.5} fill="#6a6a74" />
+                <circle cx={xScale(i)} cy={yScale(s.value)} r={2.5} className="fill-ink-muted" />
                 {i === 0 && (
-                  <text x={xScale(i) - 10} y={yScale(s.value) + 4} fill="#6a6a74" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
+                  <text x={xScale(i) - 10} y={yScale(s.value) + 4} className="fill-ink-muted" fontSize="10" textAnchor="end" fontFamily="Noto Sans Mono">
                     {s.label}
                   </text>
                 )}
               </g>
             ))}
-            <text x={xScale(i)} y={padding.top + innerHeight + 22} fill="#a8a8b3" fontSize="11" textAnchor="middle" fontFamily="Inter" fontWeight="500">
+            <text x={xScale(i)} y={padding.top + innerHeight + 22} className="fill-ink-secondary" fontSize="11" textAnchor="middle" fontFamily="Inter" fontWeight="500">
               {f.name.length > 14 ? f.name.slice(0, 13) + '…' : f.name}
             </text>
-            <text x={xScale(i)} y={padding.top + innerHeight + 38} fill="#6a6a74" fontSize="9" textAnchor="middle" fontFamily="Noto Sans Mono">
+            <text x={xScale(i)} y={padding.top + innerHeight + 38} className="fill-ink-muted" fontSize="9" textAnchor="middle" fontFamily="Noto Sans Mono">
               w {(factorWeights[i] * 100).toFixed(0)}%
             </text>
             <text x={xScale(i)} y={padding.top + innerHeight + 52} fill={crit > 0.5 ? '#fb7185' : crit > 0.3 ? '#fbbf24' : '#475569'}
@@ -3690,7 +3709,7 @@ function ParallelCoords({ factors, states, seeds, factorWeights, criticalities }
         {seeds.map((s, idx) => (
           <g key={idx} transform={`translate(${idx * 70}, 0)`}>
             <rect x={0} y={-8} width={10} height={3} fill={SEED_COLORS[idx % SEED_COLORS.length]} />
-            <text x={14} y={-3} fill="#a8a8b3" fontSize="10" fontFamily="Noto Sans Mono">#{idx + 1}</text>
+            <text x={14} y={-3} className="fill-ink-secondary" fontSize="10" fontFamily="Noto Sans Mono">#{idx + 1}</text>
           </g>
         ))}
       </g>
