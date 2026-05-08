@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, FileText, Upload, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Plus, X, AlertCircle, RotateCcw, Info, Sparkles, ArrowRight, Clock, Zap, Anchor, Target, Wand2, Loader2, RefreshCw, FileText, Upload, Check, BookOpen, Compass, Layers, Activity, Ban } from 'lucide-react';
 
 // ============================================================
 // CONSTANTS
@@ -11,23 +11,28 @@ const RI = {
   12: 1.48, 13: 1.56, 14: 1.57, 15: 1.59
 };
 
+// ============================================================
+// DEFAULT FIXTURE — AI and the economy, 15-year horizon
+// Derived from Karpathy (Oct 2025) and Dylan Patel (Mar 2026) on Dwarkesh
+// ============================================================
+
 const DEFAULT_FACTORS = [
-  { id: 'geo', name: 'Geopolitics', description: 'External political and strategic shocks' },
-  { id: 'tech', name: 'Technology Velocity', description: 'Pace of technical change vs regulatory capacity' },
-  { id: 'energy', name: 'Energy Security', description: 'Reliable, affordable energy supply' },
-  { id: 'food', name: 'Food Security', description: 'Resilient food production and distribution' },
-  { id: 'culture', name: 'Cultural Influence', description: 'Government vs platform cultural authority' },
-  { id: 'social', name: 'Social Polarisation', description: 'Fragmentation of civic space' },
-  { id: 'federal', name: 'Federalism Direction', description: 'Toward integration vs nationalism' },
-  { id: 'defense', name: 'Defense Posture', description: 'Military readiness and integration' },
+  { id: 'capability_rate',     name: 'AI Capability Progress Rate', description: 'Pace at which the cognitive deficits Karpathy identifies — continual learning, distillation, agent robustness — get resolved. Decade-of-agents thesis.' },
+  { id: 'rl_replacement',      name: 'RL Paradigm Replacement',     description: 'Whether the review-and-distill replacement for outcome-based RL gets cracked. "Sucking supervision through a straw." Discrete bifurcation candidate.' },
+  { id: 'asml_supply',         name: 'ASML / EUV Tool Production',  description: 'EUV tool production rate — currently 70/yr, projected ~100 by 2030. Dylan: most binding constraint on AI compute by 2030.' },
+  { id: 'memory_supply',       name: 'Memory Supply (HBM/DRAM)',    description: 'HBM/DRAM scaling and the consumer-demand-destruction release valve. 30% of hyperscaler CapEx is memory.' },
+  { id: 'lab_agi_pill',        name: 'Lab AGI-Pilledness',          description: 'How aggressively leading labs commit compute on long timelines. OpenAI > Anthropic > Google through 2025; Nvidia "AGI-pilled minus one".' },
+  { id: 'china_west',          name: 'China-West Divergence',       description: 'Whether China indigenises the semiconductor supply chain by 2030, and at what scale. DUV likely; EUV in lab but not at scale.' },
+  { id: 'us_power',            name: 'US Power & Data Centre Scaling', description: 'Whether power emerges as a binding constraint or stays solved by aeroderivatives, reciprocating engines, fuel cells, peaker absorption.' },
+  { id: 'agi_gdp_integration', name: 'AGI Economic Integration Mode', description: 'Whether AGI blends into the 2% GDP exponential (Karpathy) or produces a regime-change to 10-20%+ growth. The transcripts\' deepest disagreement.' },
 ];
 
 const DEFAULT_CRITERIA = [
-  { id: 'impact', name: 'Impact Magnitude', description: 'How much could this factor reshape the future?' },
-  { id: 'uncertainty', name: 'Uncertainty', description: 'How unpredictable is the trajectory?' },
-  { id: 'relevance', name: 'Decision Relevance', description: 'Does it change what you would do?' },
-  { id: 'horizon', name: 'Time Horizon Fit', description: 'Does it manifest by 2040?' },
-  { id: 'independence', name: 'Causal Independence', description: 'Does it operate independently of other factors?' },
+  { id: 'impact',       name: 'Impact Magnitude',     description: 'How much could this factor reshape the future?' },
+  { id: 'uncertainty',  name: 'Uncertainty',          description: 'How unpredictable is the trajectory?' },
+  { id: 'relevance',    name: 'Decision Relevance',   description: 'Does it change what an investor or operator should do today?' },
+  { id: 'horizon',      name: 'Time Horizon Fit',     description: 'Does it manifest within a 15-year window?' },
+  { id: 'independence', name: 'Causal Independence',  description: 'Does it operate independently of the other factors?' },
 ];
 
 const DEFAULT_STATES = [
@@ -37,6 +42,166 @@ const DEFAULT_STATES = [
 ];
 
 const DEFAULT_ARROW = { velocity: 0.5, pathDep: 0.5, proximity: 0.5, consequence: 0 };
+
+// Per-factor arrows derived from transcript claims (see ai-economy-factors.json)
+const DEFAULT_FACTOR_ARROWS = {
+  capability_rate:     { velocity: 0.75, proximity: 0.65, pathDep: 0.40, consequence: 0.70 },
+  rl_replacement:      { velocity: 0.55, proximity: 0.70, pathDep: 0.20, consequence: 0.60 },
+  asml_supply:         { velocity: 0.30, proximity: 0.55, pathDep: 0.85, consequence: 0.65 },
+  memory_supply:       { velocity: 0.80, proximity: 0.85, pathDep: 0.55, consequence: 0.40 },
+  lab_agi_pill:        { velocity: 0.65, proximity: 0.50, pathDep: 0.35, consequence: 0.55 },
+  china_west:          { velocity: 0.40, proximity: 0.45, pathDep: 0.80, consequence: 0.75 },
+  us_power:            { velocity: 0.55, proximity: 0.60, pathDep: 0.50, consequence: 0.30 },
+  agi_gdp_integration: { velocity: 0.25, proximity: 0.30, pathDep: 0.90, consequence: 0.95 },
+};
+
+// Per-factor state-label overrides (concrete meanings of Low/Mid/High per factor)
+const DEFAULT_STATE_LABELS = {
+  capability_rate:     { 0: 'Stalled — RL holds',    1: 'Karpathy decade',           2: 'Rapid — AGI <5y' },
+  rl_replacement:      { 0: 'RL persists',           1: 'Hybrid emerges',            2: 'Paradigm shift' },
+  asml_supply:         { 0: '~70/yr ceiling',        1: '~100/yr as projected',      2: 'Aggressive expansion' },
+  memory_supply:       { 0: 'Crunch intensifies',    1: 'Smartphone destruction',    2: '3D DRAM unlocks' },
+  lab_agi_pill:        { 0: 'Pull-back',             1: 'Current asymmetry',         2: 'Uniform aggression' },
+  china_west:          { 0: 'China stays trailing',  1: 'Trailing-edge match',       2: 'Indigenous EUV at scale' },
+  us_power:            { 0: 'Belief throttles CapEx', 1: 'Non-binding as Dylan says', 2: 'Power abundance' },
+  agi_gdp_integration: { 0: 'Karpathy mode (2%)',    1: 'Inflection (4-6%)',         2: 'Regime change (10-20%)' },
+};
+
+// AHP criteria pairwise matrix — produces priorities approximately [0.19, 0.16, 0.31, 0.10, 0.25]
+// Reflects: Decision Relevance dominant, Causal Independence high, Horizon lowest. CR ~0.016.
+const DEFAULT_CRITERIA_MATRIX = [
+  [1,    1,    1/2,  2,    1   ],
+  [1,    1,    1/2,  2,    1/2 ],
+  [2,    2,    1,    3,    1   ],
+  [1/2,  1/2,  1/3,  1,    1/2 ],
+  [1,    2,    1,    2,    1   ],
+];
+
+// AHP factor matrices — one per criterion. Order matches DEFAULT_FACTORS.
+// All CRs verified < 0.02 (well within Saaty's 0.10 threshold).
+const DEFAULT_FACTOR_MATRICES = {
+  // Impact: capability_rate, agi_gdp, asml highest
+  impact: [
+    [1,    2,    1,    2,    3,    2,    3,    1   ],
+    [1/2,  1,    1/2,  1,    1,    1,    2,    1/2 ],
+    [1,    2,    1,    2,    2,    2,    3,    1   ],
+    [1/2,  1,    1/2,  1,    1,    1,    2,    1/2 ],
+    [1/3,  1,    1/2,  1,    1,    1,    1,    1/3 ],
+    [1/2,  1,    1/2,  1,    1,    1,    2,    1/2 ],
+    [1/3,  1/2,  1/3,  1/2,  1,    1/2,  1,    1/3 ],
+    [1,    2,    1,    2,    3,    2,    3,    1   ],
+  ],
+  // Uncertainty: agi_gdp, rl_replacement, china_west highest
+  uncertainty: [
+    [1,    1/2,  1,    1,    1,    1/2,  2,    1/2 ],
+    [2,    1,    2,    2,    2,    1,    3,    1   ],
+    [1,    1/2,  1,    1,    1,    1/2,  2,    1/2 ],
+    [1,    1/2,  1,    1,    1/2,  1/2,  1,    1/3 ],
+    [1,    1/2,  1,    2,    1,    1,    2,    1/2 ],
+    [2,    1,    2,    2,    1,    1,    3,    1   ],
+    [1/2,  1/3,  1/2,  1,    1/2,  1/3,  1,    1/3 ],
+    [2,    1,    2,    3,    2,    1,    3,    1   ],
+  ],
+  // Decision Relevance: asml, memory, lab_agi_pill highest — actionable today
+  relevance: [
+    [1,    2,    1/2,  1/2,  1/2,  2,    2,    1   ],
+    [1/2,  1,    1/3,  1/2,  1/2,  1,    1,    1   ],
+    [2,    3,    1,    1,    1,    3,    3,    2   ],
+    [2,    2,    1,    1,    1,    2,    3,    2   ],
+    [2,    2,    1,    1,    1,    2,    3,    2   ],
+    [1/2,  1,    1/3,  1/2,  1/2,  1,    1,    1   ],
+    [1/2,  1,    1/3,  1/3,  1/3,  1,    1,    1/2 ],
+    [1,    1,    1/2,  1/2,  1/2,  1,    2,    1   ],
+  ],
+  // Time Horizon Fit: memory, capability, lab_agi_pill resolve in window
+  horizon: [
+    [1,    2,    2,    1,    1,    3,    2,    2   ],
+    [1/2,  1,    1,    1/2,  1/2,  2,    2,    2   ],
+    [1/2,  1,    1,    1/2,  1/2,  2,    1,    1   ],
+    [1,    2,    2,    1,    1,    3,    3,    3   ],
+    [1,    2,    2,    1,    1,    3,    2,    2   ],
+    [1/3,  1/2,  1/2,  1/3,  1/3,  1,    1,    1   ],
+    [1/2,  1/2,  1,    1/3,  1/2,  1,    1,    1   ],
+    [1/2,  1/2,  1,    1/3,  1/2,  1,    1,    1   ],
+  ],
+  // Causal Independence: agi_gdp, china_west, asml, us_power most independent
+  independence: [
+    [1,    1,    1/2,  1,    1,    1/2,  1/2,  1   ],
+    [1,    1,    1/2,  1,    1,    1/2,  1/2,  1   ],
+    [2,    2,    1,    2,    2,    1,    1,    2   ],
+    [1,    1,    1/2,  1,    1,    1/2,  1/2,  1   ],
+    [1,    1,    1/2,  1,    1,    1/2,  1/2,  1   ],
+    [2,    2,    1,    2,    2,    1,    1,    2   ],
+    [2,    2,    1,    2,    2,    1,    1,    2   ],
+    [1,    1,    1/2,  1,    1,    1/2,  1/2,  1   ],
+  ],
+};
+
+// Coupling matrix — 8×8, signed -9 to +9. Reflects transcript-derived structural relations.
+// Order matches DEFAULT_FACTORS (capability, rl, asml, memory, lab, china, power, agi_gdp).
+const DEFAULT_COUPLING = [
+  // cap   rl    asml  mem   lab   chin  pow   gdp
+  [  0,    8,    0,    0,    4,    0,    0,    7  ],  // capability_rate
+  [  8,    0,    0,    0,    3,    0,    0,    5  ],  // rl_replacement
+  [  0,    0,    0,    5,    6,   -6,    2,    0  ],  // asml_supply
+  [  0,    0,    5,    0,    4,    0,    0,    0  ],  // memory_supply
+  [  4,    3,    6,    4,    0,    0,    3,    4  ],  // lab_agi_pill
+  [  0,    0,   -6,    0,    0,    0,    0,   -3  ],  // china_west
+  [  0,    0,    2,    0,    3,    0,    0,    0  ],  // us_power
+  [  7,    5,    0,    0,    4,   -3,    0,    0  ],  // agi_gdp_integration
+];
+
+// Triggering chains — directional. trigger[i][j] = 1 means i triggers j.
+const DEFAULT_TRIGGERS = [
+  // cap  rl  asml mem  lab  chin pow  gdp
+  [  0,   0,  0,   0,   0,   0,   0,   1  ],  // capability_rate → agi_gdp
+  [  1,   0,  0,   0,   0,   0,   0,   0  ],  // rl_replacement → capability_rate
+  [  0,   0,  0,   1,   0,   0,   0,   0  ],  // asml_supply → memory_supply
+  [  0,   0,  0,   0,   1,   0,   0,   0  ],  // memory_supply → lab_agi_pill (crunch shakes confidence)
+  [  0,   0,  1,   1,   0,   0,   1,   0  ],  // lab_agi_pill → asml, memory, power (commitment cascades)
+  [  0,   0,  0,   0,   0,   0,   0,   0  ],
+  [  0,   0,  0,   0,   0,   0,   0,   0  ],
+  [  0,   0,  0,   0,   0,   0,   0,   0  ],
+];
+
+const DEFAULT_PURPOSE = `Stress-testing investment thesis for AI-product and AI-infrastructure positions over a 15-year horizon. Want to identify configurations where conventional bull-case assumptions fail — particularly scenarios where capability progress is real but compute supply throttles deployment, or where compute scales but capability stalls. Factor set derived from Andrej Karpathy (Oct 2025, "AGI is still a decade away") and Dylan Patel (March 2026, "Three big bottlenecks to scaling AI compute") on the Dwarkesh Podcast.`;
+
+const DEFAULT_DOCUMENTS = [
+  {
+    id: 'doc_karpathy',
+    name: 'Karpathy on Dwarkesh — Oct 2025 (summary)',
+    content: `Andrej Karpathy on the Dwarkesh Podcast, 17 Oct 2025. "AGI is still a decade away."
+
+Core claims:
+- Decade of agents, not year of agents. Cognitive deficits are tractable but still difficult.
+- Reinforcement learning is terrible — "sucking supervision through a straw" — but everything before it was worse. Need 3-5 more major algorithmic updates.
+- Models silently collapse during training; humans collapse over time too. Synthetic data alone can't fix this.
+- We're not building animals (evolution); we're building "ghosts" via internet imitation. Different starting point.
+- Cognitive cores can be ~1B parameters if pre-training data improves. Internet is mostly garbage.
+- AGI will blend into the 2.5 centuries of 2% GDP growth, not produce a discontinuous jump. Industrial Revolution was the singular event; AI continues the same exponential.
+- LLMs work for code because code is text and infrastructure exists. Other domains lag because diff/preview infrastructure isn't built.
+- Coding models are like compilers, not employee replacements — productivity tool, not labour replacement.`,
+    included: true,
+  },
+  {
+    id: 'doc_dylan',
+    name: 'Dylan Patel on Dwarkesh — March 2026 (summary)',
+    content: `Dylan Patel of SemiAnalysis on the Dwarkesh Podcast, 13 March 2026. "Deep dive on the 3 big bottlenecks to scaling AI compute."
+
+Core claims:
+- Three bottlenecks: logic, memory, power. By 2030 the binding one is ASML.
+- ASML produces 70 EUV tools/year today, ~100 by 2030 under aggressive expansion. Each gigawatt of Rubin needs ~3.5 EUV tools.
+- Hopper H100 is worth more today than 3 years ago — value is bounded by what models can extract from it, not by hardware specs.
+- Memory crunch: 30% of hyperscaler CapEx is memory. Smartphone volumes may halve to free DRAM for AI. Consumer revolt likely.
+- Nvidia secured TSMC allocation early; Google is squeezed and now catching up (Gemini 3 + Nano Banana revenue inflection woke them up).
+- Anthropic was conservative on compute, now constrained. OpenAI YOLO-signed deals and has more access. Lab AGI-pilledness is asymmetric.
+- China indigenises DUV by 2030, EUV working in lab but not high-volume. By 2030+ if takeoff is slow, Chinese vertical integration matters.
+- Power is "not really a problem" — aeroderivatives, reciprocating engines, ship engines, Bloom fuel cells, peaker absorption all available.
+- AGI-pilledness cascades down supply chain: labs > Nvidia > foundries > equipment makers. Each builds X-1 or X/2 because not pilled enough.
+- 3D DRAM by end of decade could unlock memory; still requires EUV.`,
+    included: true,
+  },
+];
 
 const STEPS = [
   { num: 1, label: 'Factors' },
@@ -112,6 +277,72 @@ function setMatrixVal(matrix, i, j, val) {
   m[i][j] = val;
   m[j][i] = 1 / val;
   return m;
+}
+
+// Extract scenario fields from a markdown-formatted LLM response.
+// Returns an object with keys: name, tagline, narrative, tension, signals, implications.
+// Tolerant of variations in heading capitalisation, missing sections, and stray fences.
+function parseScenarioMarkdown(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return { name: null };
+  }
+
+  // Strip any code fences the model might still wrap things in.
+  let text = rawText.replace(/```(?:markdown|md)?\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  const result = { name: null, tagline: null, narrative: null, tension: null, signals: [], implications: null };
+
+  // Extract name from first H1 heading.
+  const nameMatch = text.match(/^#\s+(.+?)\s*$/m);
+  if (nameMatch) {
+    result.name = nameMatch[1].trim().replace(/^["']|["']$/g, '');
+  }
+
+  // Extract tagline — the first italic line after the title, or the first non-heading paragraph.
+  const afterTitle = nameMatch ? text.slice(text.indexOf(nameMatch[0]) + nameMatch[0].length) : text;
+  const taglineMatch = afterTitle.match(/^\s*\*([^*\n]+)\*\s*$/m) || afterTitle.match(/^\s*_([^_\n]+)_\s*$/m);
+  if (taglineMatch) {
+    result.tagline = taglineMatch[1].trim();
+  }
+
+  // Find each section by H2 heading. Section names are matched loosely (case-insensitive,
+  // tolerant of slight wording variation).
+  const sectionPatterns = [
+    { key: 'narrative',    pattern: /^##\s+narrative\s*$/im },
+    { key: 'tension',      pattern: /^##\s+(?:structural\s+)?tension\s*$/im },
+    { key: 'signals',      pattern: /^##\s+(?:observable\s+)?signals?\s*$/im },
+    { key: 'implications', pattern: /^##\s+(?:strategic\s+)?implications?\s*$/im },
+  ];
+
+  // Find heading positions to determine section boundaries.
+  const sectionStarts = [];
+  for (const { key, pattern } of sectionPatterns) {
+    const m = text.match(pattern);
+    if (m) sectionStarts.push({ key, start: m.index, headingLength: m[0].length });
+  }
+  sectionStarts.sort((a, b) => a.start - b.start);
+
+  for (let i = 0; i < sectionStarts.length; i++) {
+    const { key, start, headingLength } = sectionStarts[i];
+    const contentStart = start + headingLength;
+    const contentEnd = (i + 1 < sectionStarts.length) ? sectionStarts[i + 1].start : text.length;
+    const content = text.slice(contentStart, contentEnd).trim();
+
+    if (key === 'signals') {
+      // Extract bullet items.
+      const items = [];
+      const lines = content.split('\n');
+      for (const line of lines) {
+        const m = line.match(/^\s*[-*+]\s+(.+?)\s*$/);
+        if (m) items.push(m[1].trim());
+      }
+      result.signals = items;
+    } else {
+      result[key] = content;
+    }
+  }
+
+  return result;
 }
 
 function generateAllSeeds(numFactors, numStates, cap = 200000) {
@@ -234,9 +465,17 @@ function selectDiverseSeeds(scoredSeeds, K, alpha, factorWeights, stateValues, c
     if (best) { selected.push(best); remaining.delete(best); } else break;
   }
 
-  return selected.map((s, i) => {
+  // === Hill-climbing refinement ===
+  // Greedy farthest-first is myopic — it commits early choices that might be
+  // suboptimal once K is filled. We refine by iteratively swapping each selected
+  // seed against its best alternative, keeping the swap if it raises the global
+  // utility (alpha-weighted blend of mean score and minimum pairwise distance).
+  // Converges in 2-4 passes for typical K.
+  const refinedSet = refineSelection(selected, withScore, K, alpha, factorWeights, stateValues);
+
+  return refinedSet.map((s, i) => {
     let totalD = 0; let count = 0;
-    selected.forEach((other, j) => {
+    refinedSet.forEach((other, j) => {
       if (i !== j) {
         totalD += weightedSeedDistance(s.seed, other.seed, factorWeights, stateValues);
         count++;
@@ -246,7 +485,131 @@ function selectDiverseSeeds(scoredSeeds, K, alpha, factorWeights, stateValues, c
   });
 }
 
+// Hill-climbing pass over the selected K-set. For each slot, try swapping with
+// every non-selected candidate; accept the swap if it improves the global
+// utility. Repeat until a full pass produces no improvement (capped at 8 passes).
+function refineSelection(initial, allCandidates, K, alpha, factorWeights, stateValues) {
+  if (initial.length < 2) return initial;
+
+  const score = (set) => globalUtility(set, alpha, factorWeights, stateValues);
+
+  let current = [...initial];
+  let currentScore = score(current);
+
+  const selectedSeeds = new Set(current.map(c => c.seed.join(',')));
+  const pool = allCandidates.filter(c => !selectedSeeds.has(c.seed.join(',')));
+
+  let improved = true;
+  let passes = 0;
+  const MAX_PASSES = 8;
+
+  while (improved && passes < MAX_PASSES) {
+    improved = false;
+    passes++;
+    for (let slot = 0; slot < current.length; slot++) {
+      let bestSwap = null;
+      let bestSwapScore = currentScore;
+      for (const cand of pool) {
+        const trial = [...current];
+        trial[slot] = cand;
+        const trialScore = score(trial);
+        if (trialScore > bestSwapScore + 1e-9) {
+          bestSwapScore = trialScore;
+          bestSwap = cand;
+        }
+      }
+      if (bestSwap) {
+        const ejected = current[slot];
+        current[slot] = bestSwap;
+        currentScore = bestSwapScore;
+        // Update pool: ejected returns, swapped-in is removed
+        const idx = pool.indexOf(bestSwap);
+        if (idx !== -1) pool.splice(idx, 1);
+        pool.push(ejected);
+        improved = true;
+      }
+    }
+  }
+
+  return current;
+}
+
+// Global utility of a candidate set: alpha-weighted blend of mean score and
+// minimum pairwise distance. Identical objective to the greedy step but
+// evaluated over the whole set rather than incrementally.
+function globalUtility(set, alpha, factorWeights, stateValues) {
+  if (set.length === 0) return 0;
+  const meanScore = set.reduce((s, x) => s + x.score, 0) / set.length;
+  let minDist = Infinity;
+  for (let i = 0; i < set.length; i++) {
+    for (let j = i + 1; j < set.length; j++) {
+      const d = weightedSeedDistance(set[i].seed, set[j].seed, factorWeights, stateValues);
+      if (d < minDist) minDist = d;
+    }
+  }
+  if (minDist === Infinity) minDist = 0;
+  return alpha * meanScore + (1 - alpha) * minDist;
+}
+
 // Estimate arrival window for a seed in years
+// === Hard vetoes ===
+//
+// Vetoes are factor-state pairs the strategist marks as logically impossible
+// regardless of other context. They override the soft coherence score and act
+// as an absolute filter — any seed containing a vetoed pair is removed before
+// scoring. This addresses the "compensation effect" failure mode of pure
+// aggregate-coupling: a fatal contradiction between two factors cannot be
+// masked by alignment elsewhere in the seed.
+//
+// A veto is encoded as a string key "i:s_a|j:s_b" where i<j and s_a, s_b are
+// state indices. The Set form is JSON-serialisable as an array of keys.
+
+function vetoKey(i, sa, j, sb) {
+  // Normalise so smaller factor index is first
+  if (i > j) { [i, j] = [j, i]; [sa, sb] = [sb, sa]; }
+  return `${i}:${sa}|${j}:${sb}`;
+}
+
+function parseVetoKey(key) {
+  const [a, b] = key.split('|');
+  const [i, sa] = a.split(':').map(Number);
+  const [j, sb] = b.split(':').map(Number);
+  return { i, sa, j, sb };
+}
+
+function seedViolatesVeto(seed, vetoes) {
+  if (!vetoes || vetoes.size === 0) return null;
+  for (let i = 0; i < seed.length; i++) {
+    for (let j = i + 1; j < seed.length; j++) {
+      const key = vetoKey(i, seed[i], j, seed[j]);
+      if (vetoes.has(key)) return key;
+    }
+  }
+  return null;
+}
+
+
+//
+// Replaces the previous linear `years = (1 - velocity) * H` with a saturating
+// sigmoid keyed on the full criticality product (velocity × proximity × pathDep).
+// This encodes the complexity-economics intuition: factors with weak criticality
+// drift toward the horizon at a near-linear rate, while factors with strong
+// criticality cluster their arrivals tightly near the bifurcation point as
+// reinforcing dynamics compound.
+//
+// Shape: a logistic curve centred at criticality=0.5, with steepness alpha=8.
+// At criticality 0   → arrival ≈ H
+// At criticality 0.5 → arrival ≈ H / 2
+// At criticality 1   → arrival ≈ 0
+function arrivalFromCriticality(velocity, proximity, pathDep, horizon) {
+  const criticality = velocity * proximity * (0.5 + 0.5 * pathDep);
+  const alpha = 8;
+  const x = criticality - 0.5;
+  // Logistic decay: 1 / (1 + exp(alpha * x)) maps [0,1] criticality → [~1, ~0]
+  const decay = 1 / (1 + Math.exp(alpha * x));
+  return horizon * decay;
+}
+
 function estimateArrival(seed, arrows, factors, stateValues) {
   const yearsList = [];
   const arrivingFactors = [];
@@ -255,7 +618,7 @@ function estimateArrival(seed, arrows, factors, stateValues) {
     const dev = Math.abs(stateValues[seed[i]]) / maxAbs;
     if (dev < 0.4) continue;
     const a = arrows[factors[i].id] || DEFAULT_ARROW;
-    const yrs = (1 - a.velocity) * HORIZON_YEARS;
+    const yrs = arrivalFromCriticality(a.velocity, a.proximity, a.pathDep, HORIZON_YEARS);
     yearsList.push(yrs);
     arrivingFactors.push({ factor: factors[i], years: yrs, arrow: a, deviation: dev });
   }
@@ -273,11 +636,11 @@ function estimateArrival(seed, arrows, factors, stateValues) {
 // SHARED UI
 // ============================================================
 
+// Fonts (Inter + Noto Sans Mono) load via index.html; Tailwind tokens map the family classes.
+// font-display tightens letter-spacing and enables Inter's display-friendly OpenType features.
 const fontStack = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-  .font-display { font-family: 'Fraunces', Georgia, serif; font-feature-settings: 'ss01'; letter-spacing: -0.02em; }
-  .font-body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .font-display { letter-spacing: -0.02em; font-feature-settings: 'cv11', 'ss01', 'ss03'; }
+  .font-body { font-feature-settings: 'cv11'; }
 `;
 
 function ConsistencyBadge({ cr }) {
@@ -389,31 +752,41 @@ function SmallSlider({ label, icon: Icon, value, onChange, min = 0, max = 1, ste
 // ============================================================
 
 export default function TUNAScenarioTool() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [factors, setFactors] = useState(DEFAULT_FACTORS);
   const [criteria, setCriteria] = useState(DEFAULT_CRITERIA);
-  const [criteriaMatrix, setCriteriaMatrix] = useState(() => identityMatrix(DEFAULT_CRITERIA.length));
+  const [criteriaMatrix, setCriteriaMatrix] = useState(() => DEFAULT_CRITERIA_MATRIX.map(r => [...r]));
   const [factorMatrices, setFactorMatrices] = useState(() => {
     const m = {};
-    DEFAULT_CRITERIA.forEach(c => { m[c.id] = identityMatrix(DEFAULT_FACTORS.length); });
+    DEFAULT_CRITERIA.forEach(c => {
+      const dm = DEFAULT_FACTOR_MATRICES[c.id];
+      m[c.id] = dm ? dm.map(r => [...r]) : identityMatrix(DEFAULT_FACTORS.length);
+    });
     return m;
   });
-  const [topN, setTopN] = useState(6);
+  const [topN, setTopN] = useState(8);
   const [factorArrows, setFactorArrows] = useState(() => {
     const a = {};
-    DEFAULT_FACTORS.forEach(f => { a[f.id] = { ...DEFAULT_ARROW }; });
+    DEFAULT_FACTORS.forEach(f => {
+      a[f.id] = DEFAULT_FACTOR_ARROWS[f.id] ? { ...DEFAULT_FACTOR_ARROWS[f.id] } : { ...DEFAULT_ARROW };
+    });
     return a;
   });
   const [factorStates, setFactorStates] = useState(DEFAULT_STATES);
-  const [stateLabelOverrides, setStateLabelOverrides] = useState({});
+  const [stateLabelOverrides, setStateLabelOverrides] = useState(() => {
+    const overrides = {};
+    DEFAULT_FACTORS.forEach(f => {
+      if (DEFAULT_STATE_LABELS[f.id]) overrides[f.id] = { ...DEFAULT_STATE_LABELS[f.id] };
+    });
+    return overrides;
+  });
   // Signed coupling: -9 to +9
-  const [couplingMatrix, setCouplingMatrix] = useState(() =>
-    Array.from({ length: 6 }, () => Array(6).fill(0))
-  );
+  const [couplingMatrix, setCouplingMatrix] = useState(() => DEFAULT_COUPLING.map(r => [...r]));
   // Asymmetric trigger matrix: trigger[i][j] = does i trigger j? (0 or 1)
-  const [triggerMatrix, setTriggerMatrix] = useState(() =>
-    Array.from({ length: 6 }, () => Array(6).fill(0))
-  );
+  const [triggerMatrix, setTriggerMatrix] = useState(() => DEFAULT_TRIGGERS.map(r => [...r]));
+  // Hard vetoes — Set of vetoKey() strings. Seeds containing any vetoed pair
+  // are filtered out before scoring, regardless of coherence.
+  const [vetoes, setVetoes] = useState(() => new Set());
   const [K, setK] = useState(4);
   const [alpha, setAlpha] = useState(0.5);
   const [convergenceFocus, setConvergenceFocus] = useState(0.6);
@@ -421,11 +794,13 @@ export default function TUNAScenarioTool() {
   const [seedNames, setSeedNames] = useState({});
   const [seedPhases, setSeedPhases] = useState({});
   // Strategic context for AI generation
-  const [purpose, setPurpose] = useState('');
-  const [audiencePreset, setAudiencePreset] = useState('mixed');
+  const [purpose, setPurpose] = useState(DEFAULT_PURPOSE);
+  const [audiencePreset, setAudiencePreset] = useState('investors');
   const [audienceCustom, setAudienceCustom] = useState('');
-  const [documents, setDocuments] = useState([]); // [{id, name, content, included}]
-  // Errors from building the AI prompt download
+  const [documents, setDocuments] = useState(DEFAULT_DOCUMENTS.map(d => ({ ...d })));
+  // AI scenario generation state
+  const [generatedScenarios, setGeneratedScenarios] = useState({});
+  const [generatingIdx, setGeneratingIdx] = useState(null);
   const [generationErrors, setGenerationErrors] = useState({});
 
   // Sync matrices when factors / criteria change
@@ -522,13 +897,29 @@ export default function TUNAScenarioTool() {
     return generateAllSeeds(topFactors.length, factorStates.length);
   }, [topFactors.length, factorStates.length]);
 
+  // Hard-veto filter — runs before scoring to enforce absolute exclusions.
+  // The compensation effect of pure aggregate-coupling cannot mask a vetoed
+  // factor-state pair regardless of how internally coherent the rest of the
+  // seed appears.
+  const vetoSurvivors = useMemo(() => {
+    if (!seedSpace.seeds) return { seeds: [], rejected: 0 };
+    if (vetoes.size === 0) return { seeds: seedSpace.seeds, rejected: 0 };
+    const ok = [];
+    let rejected = 0;
+    for (const seed of seedSpace.seeds) {
+      if (seedViolatesVeto(seed, vetoes)) rejected++;
+      else ok.push(seed);
+    }
+    return { seeds: ok, rejected };
+  }, [seedSpace, vetoes]);
+
   const scoredSeeds = useMemo(() => {
-    if (!seedSpace.seeds) return [];
-    return seedSpace.seeds.map(seed => ({
+    if (!vetoSurvivors.seeds || vetoSurvivors.seeds.length === 0) return [];
+    return vetoSurvivors.seeds.map(seed => ({
       seed,
       ...scoreSeed(seed, topFactorWeights, topCriticalities, couplingMatrix, stateValues),
     }));
-  }, [seedSpace, topFactorWeights, topCriticalities, couplingMatrix, stateValues]);
+  }, [vetoSurvivors, topFactorWeights, topCriticalities, couplingMatrix, stateValues]);
 
   const filteredSeeds = useMemo(() => {
     return scoredSeeds.filter(s => s.coherence >= coherenceThreshold);
@@ -548,31 +939,45 @@ export default function TUNAScenarioTool() {
 
   // === Validation ===
   const canProceed = {
+    0: true,
     1: factors.length >= 3, 2: criteria.length >= 2, 3: true, 4: true,
     5: true, 6: true, 7: factorStates.length >= 2, 8: true, 9: true, 10: true,
   };
 
   // === Reset ===
   const handleReset = () => {
-    if (!confirm('Reset all data to defaults?')) return;
+    if (!confirm('Reset all data to the AI-and-economy fixture?')) return;
     setFactors(DEFAULT_FACTORS);
     setCriteria(DEFAULT_CRITERIA);
-    setCriteriaMatrix(identityMatrix(DEFAULT_CRITERIA.length));
+    setCriteriaMatrix(DEFAULT_CRITERIA_MATRIX.map(r => [...r]));
     const fm = {};
-    DEFAULT_CRITERIA.forEach(c => { fm[c.id] = identityMatrix(DEFAULT_FACTORS.length); });
+    DEFAULT_CRITERIA.forEach(c => {
+      const dm = DEFAULT_FACTOR_MATRICES[c.id];
+      fm[c.id] = dm ? dm.map(r => [...r]) : identityMatrix(DEFAULT_FACTORS.length);
+    });
     setFactorMatrices(fm);
-    setTopN(6);
+    setTopN(8);
     const fa = {};
-    DEFAULT_FACTORS.forEach(f => { fa[f.id] = { ...DEFAULT_ARROW }; });
+    DEFAULT_FACTORS.forEach(f => {
+      fa[f.id] = DEFAULT_FACTOR_ARROWS[f.id] ? { ...DEFAULT_FACTOR_ARROWS[f.id] } : { ...DEFAULT_ARROW };
+    });
     setFactorArrows(fa);
     setFactorStates(DEFAULT_STATES);
-    setStateLabelOverrides({});
-    setCouplingMatrix(Array.from({ length: 6 }, () => Array(6).fill(0)));
-    setTriggerMatrix(Array.from({ length: 6 }, () => Array(6).fill(0)));
+    const overrides = {};
+    DEFAULT_FACTORS.forEach(f => {
+      if (DEFAULT_STATE_LABELS[f.id]) overrides[f.id] = { ...DEFAULT_STATE_LABELS[f.id] };
+    });
+    setStateLabelOverrides(overrides);
+    setCouplingMatrix(DEFAULT_COUPLING.map(r => [...r]));
+    setTriggerMatrix(DEFAULT_TRIGGERS.map(r => [...r]));
+    setVetoes(new Set());
     setK(4); setAlpha(0.5); setConvergenceFocus(0.6); setCoherenceThreshold(0.4);
     setSeedNames({}); setSeedPhases({});
-    setPurpose(''); setAudiencePreset('mixed'); setAudienceCustom(''); setDocuments([]);
-    setGenerationErrors({});
+    setPurpose(DEFAULT_PURPOSE);
+    setAudiencePreset('investors');
+    setAudienceCustom('');
+    setDocuments(DEFAULT_DOCUMENTS.map(d => ({ ...d })));
+    setGeneratedScenarios({}); setGeneratingIdx(null); setGenerationErrors({});
     setStep(1);
   };
 
@@ -580,6 +985,7 @@ export default function TUNAScenarioTool() {
 
   const renderStep = () => {
     switch (step) {
+      case 0: return <StepIntro onBegin={() => setStep(1)} />;
       case 1: return <StepFactors factors={factors} setFactors={setFactors} />;
       case 2: return <StepCriteria criteria={criteria} setCriteria={setCriteria} />;
       case 3: return <StepWeightCriteria criteria={criteria} matrix={criteriaMatrix} setMatrix={setCriteriaMatrix} weights={criteriaWeights} cr={criteriaCR} />;
@@ -587,9 +993,9 @@ export default function TUNAScenarioTool() {
       case 5: return <StepSynthesis factors={factors} criteria={criteria} factorWeightsByCriterion={factorWeightsByCriterion} globalFactorWeights={globalFactorWeights} topN={topN} setTopN={setTopN} />;
       case 6: return <StepArrows topFactors={topFactors} factorArrows={factorArrows} setFactorArrows={setFactorArrows} />;
       case 7: return <StepStates factorStates={factorStates} setFactorStates={setFactorStates} topFactors={topFactors} stateLabelOverrides={stateLabelOverrides} setStateLabelOverrides={setStateLabelOverrides} />;
-      case 8: return <StepCoupling topFactors={topFactors} couplingMatrix={couplingMatrix} setCouplingMatrix={setCouplingMatrix} triggerMatrix={triggerMatrix} setTriggerMatrix={setTriggerMatrix} />;
+      case 8: return <StepCoupling topFactors={topFactors} couplingMatrix={couplingMatrix} setCouplingMatrix={setCouplingMatrix} triggerMatrix={triggerMatrix} setTriggerMatrix={setTriggerMatrix} vetoes={vetoes} setVetoes={setVetoes} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} />;
       case 9: return <StepContext purpose={purpose} setPurpose={setPurpose} audiencePreset={audiencePreset} setAudiencePreset={setAudiencePreset} audienceCustom={audienceCustom} setAudienceCustom={setAudienceCustom} documents={documents} setDocuments={setDocuments} />;
-      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
+      case 10: return <StepSeeds topFactors={topFactors} factorStates={factorStates} stateLabelOverrides={stateLabelOverrides} seedSpace={seedSpace} vetoSurvivors={vetoSurvivors} vetoes={vetoes} scoredSeeds={scoredSeeds} filteredSeeds={filteredSeeds} selectedSeeds={enrichedSeeds} K={K} setK={setK} alpha={alpha} setAlpha={setAlpha} convergenceFocus={convergenceFocus} setConvergenceFocus={setConvergenceFocus} coherenceThreshold={coherenceThreshold} setCoherenceThreshold={setCoherenceThreshold} seedNames={seedNames} setSeedNames={setSeedNames} seedPhases={seedPhases} setSeedPhases={setSeedPhases} topFactorWeights={topFactorWeights} topCriticalities={topCriticalities} factorArrows={factorArrows} couplingMatrix={couplingMatrix} triggerMatrix={triggerMatrix} generatedScenarios={generatedScenarios} setGeneratedScenarios={setGeneratedScenarios} generatingIdx={generatingIdx} setGeneratingIdx={setGeneratingIdx} generationErrors={generationErrors} setGenerationErrors={setGenerationErrors} purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />;
       default: return null;
     }
   };
@@ -600,21 +1006,38 @@ export default function TUNAScenarioTool() {
 
       <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="font-display text-2xl text-slate-50 leading-tight">TUNA Scenario Selector</h1>
+          <div className={`flex items-center justify-between ${step === 0 ? '' : 'mb-4'}`}>
+            <button
+              onClick={() => setStep(0)}
+              className="text-left group"
+              title="Return to introduction"
+            >
+              <h1 className="font-display text-2xl text-slate-50 leading-tight group-hover:text-amber-400 transition">TUNA Scenario Selector</h1>
               <p className="text-xs font-mono text-slate-500 mt-0.5">
                 AHP weighting · arrows of time · signed coupling · convergence-driven seed selection
               </p>
-            </div>
-            <button
-              onClick={handleReset}
-              className="text-xs font-mono text-slate-500 hover:text-slate-300 flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
-            >
-              <RotateCcw size={12} /> Reset
             </button>
+            <div className="flex items-center gap-2">
+              {step > 0 && (
+                <button
+                  onClick={() => setStep(0)}
+                  className="text-xs font-mono text-slate-500 hover:text-slate-300 flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
+                >
+                  <BookOpen size={12} /> About
+                </button>
+              )}
+              {step > 0 && (
+                <button
+                  onClick={handleReset}
+                  className="text-xs font-mono text-slate-500 hover:text-slate-300 flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
+                >
+                  <RotateCcw size={12} /> Reset
+                </button>
+              )}
+            </div>
           </div>
 
+          {step > 0 && (
           <div className="flex items-center gap-1 overflow-x-auto">
             {STEPS.map((s, idx) => (
               <React.Fragment key={s.num}>
@@ -640,6 +1063,7 @@ export default function TUNAScenarioTool() {
               </React.Fragment>
             ))}
           </div>
+          )}
         </div>
       </div>
 
@@ -650,22 +1074,286 @@ export default function TUNAScenarioTool() {
       <div className="border-t border-slate-800 bg-slate-900/50 backdrop-blur fixed bottom-0 left-0 right-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
-            onClick={() => setStep(s => Math.max(1, s - 1))}
-            disabled={step === 1}
+            onClick={() => setStep(s => Math.max(0, s - 1))}
+            disabled={step === 0}
             className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             <ChevronLeft size={16} /> Back
           </button>
-          <div className="text-xs font-mono text-slate-600">Step {step} / {STEPS.length}</div>
+          <div className="text-xs font-mono text-slate-600">
+            {step === 0 ? 'Introduction' : `Step ${step} / ${STEPS.length}`}
+          </div>
           <button
             onClick={() => setStep(s => Math.min(STEPS.length, s + 1))}
             disabled={step === STEPS.length || !canProceed[step]}
             className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-2 rounded disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
-            {step === STEPS.length ? 'Done' : 'Continue'} <ChevronRight size={16} />
+            {step === 0 ? 'Begin' : step === STEPS.length ? 'Done' : 'Continue'} <ChevronRight size={16} />
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// STEP 0 — INTRODUCTION / LANDING
+// ============================================================
+
+function StepIntro({ onBegin }) {
+  const methods = [
+    {
+      icon: Target,
+      name: 'Analytic Hierarchy Process',
+      attribution: 'Saaty, 1977',
+      blurb: 'Pairwise comparisons on a 1–9 ratio scale derive defensible priorities for criteria and factors. The Consistency Ratio surfaces internal contradictions before they propagate.',
+    },
+    {
+      icon: Layers,
+      name: 'Morphological Analysis',
+      attribution: 'Zwicky 1969 · Ritchey 2011',
+      blurb: 'Treats each factor as a dimension with a small set of discrete states and exhaustively enumerates the configuration space. K^N seed candidates, every one structurally distinct.',
+    },
+    {
+      icon: Activity,
+      name: 'Signed Cross-Consistency',
+      attribution: 'aggregate-coupling approximation',
+      blurb: 'Each factor pair gets a signed coupling strength: reinforcing (factors trend together) or damping (factors oppose). Coherence is computed at the seed level, filtering incoherent configurations.',
+    },
+    {
+      icon: Clock,
+      name: 'Arrows of Time',
+      attribution: 'Oxford OSPA',
+      blurb: 'Per-factor velocity, proximity, and path-dependency anchor seeds in time. Convergence-potential scoring identifies seeds at the structural moment of bifurcation, not arbitrary spatial corners.',
+    },
+  ];
+
+  const exclusions = [
+    {
+      title: 'Not a forecasting tool.',
+      body: 'No probabilities are estimated. Scenarios are imaginative explorations of plausible futures under irreducible uncertainty, not predictions.',
+    },
+    {
+      title: 'Not a finished scenario.',
+      body: 'The output is a small set of structured seeds. Narrative writing — the story, the signals, the strategic implications — remains with the human strategist.',
+    },
+    {
+      title: 'Not a substitute for judgement.',
+      body: 'Every weight, every coupling, every state assignment comes from the strategist. The tool enforces structure on those judgements; it does not replace them.',
+    },
+    {
+      title: 'Not a strategy wind-tunnel.',
+      body: 'Testing organisational strategies against the seed set (OSPA’s next step) is out of scope here. This tool stops at seed generation.',
+    },
+    {
+      title: 'Not a collaboration platform.',
+      body: 'No multi-user co-editing, no comments, no review workflow. One strategist, one project, one browser session.',
+    },
+    {
+      title: 'Not a server.',
+      body: 'All computation runs client-side. Nothing is transmitted; persistence is browser-local; exports are downloadable Blobs you control.',
+    },
+    {
+      title: 'Not an LLM narrative generator.',
+      body: 'The pipeline is deterministic mathematics from start to finish. AI-assisted narrative drafting is a separate, downstream activity.',
+    },
+    {
+      title: 'Not a 2×2 driving-forces matrix.',
+      body: 'It is a structural alternative to the GBN method. If you came looking for two axes and four quadrants, this is the wrong tool.',
+    },
+  ];
+
+  return (
+    <div className="space-y-16 max-w-5xl mx-auto">
+      {/* HERO */}
+      <section className="space-y-6 pt-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-800 bg-slate-900/50">
+          <Compass size={12} className="text-amber-400" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Strategic scenario generation under deep uncertainty</span>
+        </div>
+        <h1 className="font-display text-5xl md:text-6xl text-slate-50 leading-[1.05] tracking-tight">
+          Scenario seeds for <span className="text-amber-400">TUNA</span> conditions —
+          <span className="text-slate-400"> structurally distinct, internally coherent, anchored in time.</span>
+        </h1>
+        <p className="text-lg text-slate-300 leading-relaxed max-w-3xl">
+          A morphological scenario seed generator for futures characterised by
+          <span className="text-slate-100"> Turbulence, Unpredictability, Novelty, and Ambiguity</span>.
+          Built to address the structural weaknesses of the standard 2×2 driving-forces method while preserving its strengths: imagination, defensibility, and stakeholder traction.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <button
+            onClick={onBegin}
+            className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-5 py-2.5 rounded transition"
+          >
+            Begin <ArrowRight size={16} />
+          </button>
+          <span className="text-xs font-mono text-slate-500">10 steps · ~30 minutes · entirely client-side</span>
+        </div>
+      </section>
+
+      {/* PROBLEM */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-px bg-amber-500/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400">The problem</span>
+        </div>
+        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+          The dominant scenario method has three structural weaknesses.
+        </h2>
+        <p className="text-slate-300 leading-relaxed">
+          The Global Business Network (GBN) intuitive-logics method, codified by Schwartz, Wack, and Ogilvy in the 1980s, has been the consensus practice in corporate strategy for forty years. It produces four scenarios by selecting two high-impact, high-uncertainty driving forces as axes of a 2×2 matrix. The method works — in the sense that it produces scenarios strategists and boards can engage with — but experienced practitioners work around three weaknesses informally.
+        </p>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-rose-400">Weakness 1</div>
+            <div className="font-display text-lg text-slate-100">Causal entanglement</div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Two driving forces can both score high on impact and uncertainty but be causally linked, so the four quadrants of the 2×2 collapse into two effective futures — or one.
+            </p>
+          </div>
+          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-rose-400">Weakness 2</div>
+            <div className="font-display text-lg text-slate-100">Static time</div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Scenarios become spatial configurations rather than transitional moments. In TUNA conditions — complex adaptive systems that bifurcate rather than evolve smoothly — the moments of structural transition are precisely what should be illuminated.
+            </p>
+          </div>
+          <div className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-2">
+            <div className="text-xs font-mono text-rose-400">Weakness 3</div>
+            <div className="font-display text-lg text-slate-100">Opaque reasoning</div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              “Why these four scenarios rather than four others?” The conventional answer is “this was our judgement.” Increasingly insufficient for sophisticated audiences expecting reasoning transparency.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* METHODOLOGY */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-px bg-emerald-500/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">The methodology</span>
+        </div>
+        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+          Four traditions integrated into one deterministic pipeline.
+        </h2>
+        <p className="text-slate-300 leading-relaxed">
+          Each step is named, scoped, and tested. The output is a small set of seeds — typically four — that are mathematically distinct, internally coherent, anchored in time, and defended by an auditable chain of judgement.
+        </p>
+        <div className="grid md:grid-cols-2 gap-4">
+          {methods.map((m, i) => {
+            const Icon = m.icon;
+            return (
+              <div key={i} className="border border-slate-800 bg-slate-900/40 rounded-lg p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                    <Icon size={16} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="font-display text-lg text-slate-100 leading-tight">{m.name}</div>
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mt-0.5">{m.attribution}</div>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-400 leading-relaxed">{m.blurb}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* WHY IT MATTERS */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-px bg-amber-500/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400">Why it matters</span>
+        </div>
+        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+          Bifurcation, not extrapolation.
+        </h2>
+        <div className="grid md:grid-cols-2 gap-6 text-slate-300 leading-relaxed">
+          <div className="space-y-4">
+            <p>
+              Emery and Trist (1965) classified organisational environments into four types based on causal interconnection. The fourth — <span className="text-slate-100">turbulent fields</span> — is dynamic, highly interconnected, with changes amplifying through the system in unpredictable ways. Frank Knight (1921) distinguished risk (probabilities knowable, calculable, insurable) from uncertainty (probabilities unknowable, irreducible to mathematics).
+            </p>
+            <p>
+              The intersection of turbulent-field dynamics with Knightian uncertainty is what Oxford’s Saïd Business School calls <span className="text-amber-400 font-medium">TUNA conditions</span> — the design target for this tool.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <p>
+              W. Brian Arthur’s complexity economics provides the structural model. Technologies recombine at exponential rates, producing emergent properties that cannot be predicted from component analysis. Positive feedback drives runaway dynamics rather than equilibrium. Systems accumulate tension until they hit <span className="text-emerald-400 font-medium">bifurcation points</span> and snap into qualitatively new configurations.
+            </p>
+            <p>
+              The strategist’s task is not to predict which bifurcation will happen but to <span className="text-slate-100">imagine plausible post-bifurcation realities and prepare for them</span>. The convergence-potential metric identifies seeds at exactly those structural transitions.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* WORKFLOW */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-px bg-emerald-500/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">The workflow</span>
+        </div>
+        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+          Ten steps from candidate factors to named seeds.
+        </h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          {STEPS.map((s, idx) => (
+            <div key={s.num} className="border border-slate-800 bg-slate-900/40 rounded p-3 flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-[10px] font-mono flex items-center justify-center flex-shrink-0">
+                {s.num}
+              </span>
+              <span className="text-sm text-slate-200 truncate">{s.label}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-slate-500 leading-relaxed">
+          The first five steps weight criteria and factors via AHP. Steps 6–8 set the temporal arrows, state palette, and signed coupling. Step 9 captures the strategic context. Step 10 generates, filters, scores, and selects the seed set — with arrival timeline and parallel-coordinates visualisation.
+        </p>
+      </section>
+
+      {/* WHAT IT IS NOT */}
+      <section className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-px bg-rose-500/60" />
+          <span className="text-[10px] font-mono uppercase tracking-widest text-rose-400">What this tool is not</span>
+        </div>
+        <h2 className="font-display text-3xl text-slate-100 leading-tight">
+          Knowing the boundary is part of the contract.
+        </h2>
+        <p className="text-slate-300 leading-relaxed max-w-3xl">
+          A clear scope is what keeps a method useful. The following are deliberately excluded — some belong to adjacent activities, some are out of scope for v1, some are explicitly someone else’s job.
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          {exclusions.map((x, i) => (
+            <div key={i} className="border border-slate-800 bg-slate-900/40 rounded-lg p-4 flex gap-3">
+              <Ban size={16} className="text-rose-400 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-slate-100">{x.title}</div>
+                <p className="text-xs text-slate-400 leading-relaxed">{x.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="border-t border-slate-800 pt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="font-display text-xl text-slate-100">Ready to begin.</div>
+          <p className="text-sm text-slate-400">
+            The default fixture is loaded with an AI-and-economy 15-year horizon. Reset to start clean, or work through the steps to produce your seed set.
+          </p>
+        </div>
+        <button
+          onClick={onBegin}
+          className="flex items-center gap-2 text-sm font-medium bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-3 rounded transition flex-shrink-0"
+        >
+          Start the workflow <ArrowRight size={16} />
+        </button>
+      </section>
     </div>
   );
 }
@@ -1336,7 +2024,7 @@ function StepStates({ factorStates, setFactorStates, topFactors, stateLabelOverr
 // STEP 8 — SIGNED COUPLING + TRIGGERING
 // ============================================================
 
-function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMatrix, setTriggerMatrix }) {
+function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMatrix, setTriggerMatrix, vetoes, setVetoes, factorStates, stateLabelOverrides }) {
   const updateCoupling = (i, j, val) => {
     const m = couplingMatrix.map(r => [...r]);
     m[i][j] = val;
@@ -1349,6 +2037,17 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
     m[from][to] = m[from][to] ? 0 : 1;
     setTriggerMatrix(m);
   };
+
+  const toggleVeto = (i, sa, j, sb) => {
+    const key = vetoKey(i, sa, j, sb);
+    const next = new Set(vetoes);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setVetoes(next);
+  };
+
+  const stateLabel = (factorId, stateIdx) =>
+    stateLabelOverrides[factorId]?.[stateIdx] || factorStates[stateIdx]?.label || '';
 
   const pairs = [];
   for (let i = 0; i < topFactors.length; i++) {
@@ -1453,6 +2152,176 @@ function StepCoupling({ topFactors, couplingMatrix, setCouplingMatrix, triggerMa
           );
         })}
       </div>
+
+      {/* === Hard vetoes === */}
+      <div className="bg-slate-900 rounded-lg border border-rose-500/30 p-6 space-y-4">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="font-display text-xl text-slate-50 mb-1">Hard vetoes</h3>
+            <p className="text-sm text-slate-400 max-w-2xl">
+              Mark specific factor-state pairs as logically impossible. Any seed containing a vetoed pair is removed before scoring, regardless of how internally coherent the rest of it appears. This catches structural impossibilities that the soft coherence score might otherwise let through.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-rose-400">
+            {vetoes.size} {vetoes.size === 1 ? 'veto' : 'vetoes'} declared
+          </span>
+        </div>
+
+        <VetoEditor
+          topFactors={topFactors}
+          factorStates={factorStates}
+          stateLabel={stateLabel}
+          vetoes={vetoes}
+          toggleVeto={toggleVeto}
+          setVetoes={setVetoes}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Veto editor: two factor-pickers + state pickers + add button + list of declared vetoes.
+function VetoEditor({ topFactors, factorStates, stateLabel, vetoes, toggleVeto, setVetoes }) {
+  const [draftI, setDraftI] = useState(0);
+  const [draftSa, setDraftSa] = useState(factorStates.length - 1);
+  const [draftJ, setDraftJ] = useState(1);
+  const [draftSb, setDraftSb] = useState(0);
+
+  const draftKey = vetoKey(draftI, draftSa, draftJ, draftSb);
+  const draftAlreadyExists = vetoes.has(draftKey);
+  const draftIsSelfPair = draftI === draftJ;
+
+  const addDraft = () => {
+    if (draftIsSelfPair) return;
+    if (draftAlreadyExists) return;
+    toggleVeto(draftI, draftSa, draftJ, draftSb);
+  };
+
+  const clearAll = () => {
+    if (vetoes.size === 0) return;
+    if (!confirm(`Remove all ${vetoes.size} vetoes?`)) return;
+    setVetoes(new Set());
+  };
+
+  const declared = Array.from(vetoes).map(k => parseVetoKey(k));
+
+  return (
+    <div className="space-y-4">
+      {/* Draft builder */}
+      <div className="bg-slate-950 rounded border border-slate-800 p-4">
+        <div className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-3">Declare an impossible pair</div>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr_auto] gap-3 items-end">
+          {/* Left side */}
+          <div className="space-y-2">
+            <select
+              value={draftI}
+              onChange={(e) => setDraftI(Number(e.target.value))}
+              className="w-full bg-slate-900 text-slate-100 text-sm px-3 py-2 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+            >
+              {topFactors.map((tf, idx) => (
+                <option key={idx} value={idx}>{tf.factor.name}</option>
+              ))}
+            </select>
+            <select
+              value={draftSa}
+              onChange={(e) => setDraftSa(Number(e.target.value))}
+              className="w-full bg-slate-950 text-slate-300 text-xs font-mono px-3 py-1.5 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+            >
+              {factorStates.map((s, idx) => (
+                <option key={idx} value={idx}>{stateLabel(topFactors[draftI]?.factor.id, idx)}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Conjunction */}
+          <div className="text-center">
+            <div className="text-xs font-mono text-rose-400 uppercase tracking-wider">cannot coexist with</div>
+            <div className="text-rose-400 text-2xl mt-1">⊗</div>
+          </div>
+
+          {/* Right side */}
+          <div className="space-y-2">
+            <select
+              value={draftJ}
+              onChange={(e) => setDraftJ(Number(e.target.value))}
+              className="w-full bg-slate-900 text-slate-100 text-sm px-3 py-2 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+            >
+              {topFactors.map((tf, idx) => (
+                <option key={idx} value={idx}>{tf.factor.name}</option>
+              ))}
+            </select>
+            <select
+              value={draftSb}
+              onChange={(e) => setDraftSb(Number(e.target.value))}
+              className="w-full bg-slate-950 text-slate-300 text-xs font-mono px-3 py-1.5 rounded border border-slate-800 focus:border-rose-500/50 focus:outline-none"
+            >
+              {factorStates.map((s, idx) => (
+                <option key={idx} value={idx}>{stateLabel(topFactors[draftJ]?.factor.id, idx)}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Add button */}
+          <button
+            onClick={addDraft}
+            disabled={draftIsSelfPair || draftAlreadyExists}
+            className={`
+              flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition self-start
+              ${draftIsSelfPair || draftAlreadyExists
+                ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                : 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/40'
+              }
+            `}
+          >
+            <Plus size={14} />
+            {draftAlreadyExists ? 'Already vetoed' : draftIsSelfPair ? 'Pick two factors' : 'Add veto'}
+          </button>
+        </div>
+      </div>
+
+      {/* Declared vetoes list */}
+      {declared.length > 0 ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-mono uppercase tracking-wider text-slate-500">Declared vetoes</div>
+            <button
+              onClick={clearAll}
+              className="text-xs font-mono text-slate-500 hover:text-rose-400 transition"
+            >
+              clear all
+            </button>
+          </div>
+          <ul className="space-y-1.5">
+            {declared.map(({ i, sa, j, sb }) => {
+              const fi = topFactors[i]?.factor;
+              const fj = topFactors[j]?.factor;
+              if (!fi || !fj) return null;
+              return (
+                <li key={vetoKey(i, sa, j, sb)} className="flex items-center justify-between gap-3 bg-rose-500/5 border border-rose-500/20 rounded px-3 py-2">
+                  <div className="flex items-baseline gap-2 text-sm flex-1 flex-wrap">
+                    <span className="text-slate-200">{fi.name}</span>
+                    <span className="font-mono text-xs text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded">{stateLabel(fi.id, sa)}</span>
+                    <span className="text-rose-400 font-mono">⊗</span>
+                    <span className="text-slate-200">{fj.name}</span>
+                    <span className="font-mono text-xs text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded">{stateLabel(fj.id, sb)}</span>
+                  </div>
+                  <button
+                    onClick={() => toggleVeto(i, sa, j, sb)}
+                    className="text-slate-600 hover:text-rose-400 transition flex-shrink-0"
+                    title="Remove this veto"
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className="text-xs text-slate-500 italic px-1">
+          No vetoes declared. The soft coherence score is the only filter.
+        </div>
+      )}
     </div>
   );
 }
@@ -1674,7 +2543,7 @@ function StepContext({ purpose, setPurpose, audiencePreset, setAudiencePreset, a
 // STEP 10 — SEEDS WITH CONVERGENCE & ARRIVAL
 // ============================================================
 
-function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
+function StepSeeds({ topFactors, factorStates, stateLabelOverrides, seedSpace, vetoSurvivors, vetoes, scoredSeeds, filteredSeeds, selectedSeeds, K, setK, alpha, setAlpha, convergenceFocus, setConvergenceFocus, coherenceThreshold, setCoherenceThreshold, seedNames, setSeedNames, seedPhases, setSeedPhases, topFactorWeights, topCriticalities, factorArrows, couplingMatrix, triggerMatrix, generatedScenarios, setGeneratedScenarios, generatingIdx, setGeneratingIdx, generationErrors, setGenerationErrors, purpose, audiencePreset, audienceCustom, documents }) {
 
   const stateLabel = (factorId, stateIdx) =>
     stateLabelOverrides[factorId]?.[stateIdx] || factorStates[stateIdx]?.label || '';
@@ -1772,44 +2641,76 @@ Coherence: ${(seed.coherence * 100).toFixed(0)}/100 (lower means internal tensio
 Convergence: ${(seed.convergence * 100).toFixed(0)}/100 (higher means multiple high-criticality factors at extremes simultaneously)
 
 ${userName ? `=== USER-PROVIDED WORKING NAME ===\n"${userName}" — feel free to refine or replace if a stronger name suggests itself.\n` : ''}
-=== INSTRUCTIONS ===
-Write the scenario as a single JSON object with the following keys, returning ONLY the JSON object with no preamble, no markdown fences, no commentary outside the JSON:
+=== OUTPUT FORMAT ===
+Write the scenario in markdown with the following structure exactly. Use the heading levels shown. Do not include any preamble, closing remarks, or commentary outside this structure.
 
-{
-  "name": "Evocative 2-4 word scenario name (e.g. 'The Hardened Decade', 'The Velocity Trap', 'Splintered Commons')",
-  "tagline": "One-sentence summary of the world",
-  "narrative": "Exactly 2 paragraphs, 200-280 words total. Describe the world: what's happening, how it feels day-to-day, what tensions are at play. Specific and grounded. Avoid generic platitudes about technology, society, or change. Reference specific factors and their interactions where relevant. Write in present tense as if observing the year ${new Date().getFullYear() + Math.round(seed.arrival.median)} from within it.",
-  "tension": "1 paragraph, 80-120 words. The structural tension or hidden dependency that determines whether this scenario sustains or snaps into the next. Reference the coupling structure or arriving arrows where relevant.",
-  "signals": ["3-5 concrete observable signals that would tell us the world is moving toward this seed. Each signal should be specific and falsifiable, not vague trend statements."],
-  "implications": "1 paragraph, 80-120 words. What this scenario favours and disfavours strategically. Specific to the factor configuration. Avoid generic strategic advice."
-}
+# [Evocative 2-4 word scenario name]
 
-Return ONLY the JSON. No backticks, no explanation, no markdown.`;
+*[One-sentence tagline summarising the world]*
+
+## Narrative
+
+[Exactly 2 paragraphs, 200-280 words total. Describe the world: what's happening, how it feels day-to-day, what tensions are at play. Specific and grounded. Avoid generic platitudes about technology, society, or change. Reference specific factors and their interactions where relevant. Write in present tense as if observing the year ${new Date().getFullYear() + Math.round(seed.arrival.median)} from within it. Separate the two paragraphs with a blank line.]
+
+## Structural tension
+
+[1 paragraph, 80-120 words. The structural tension or hidden dependency that determines whether this scenario sustains or snaps into the next. Reference the coupling structure or arriving arrows where relevant.]
+
+## Observable signals
+
+- [Concrete, specific, falsifiable signal #1]
+- [Concrete, specific, falsifiable signal #2]
+- [Concrete, specific, falsifiable signal #3]
+- [Concrete, specific, falsifiable signal #4 — optional]
+- [Concrete, specific, falsifiable signal #5 — optional]
+
+## Strategic implications
+
+[1 paragraph, 80-120 words. What this scenario favours and disfavours strategically. Specific to the factor configuration. Avoid generic strategic advice.]
+
+Use evocative scenario names like "The Hardened Decade", "The Velocity Trap", "Splintered Commons", or whatever fits this seed. Begin your response with the # heading.`;
   };
 
-  const generateScenario = (idx) => {
+  const generateScenario = async (idx) => {
+    setGeneratingIdx(idx);
+    setGenerationErrors({ ...generationErrors, [idx]: null });
+
     try {
       const prompt = buildPrompt(idx);
-      if (!prompt) return;
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
 
-      const slug = (seedNames[idx] || `seed-${idx + 1}`)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '')
-        .slice(0, 60) || `seed-${idx + 1}`;
+      if (!response.ok) {
+        throw new Error(`API error ${response.status}`);
+      }
 
-      const blob = new Blob([prompt], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `tuna-prompt-${slug}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      setGenerationErrors({ ...generationErrors, [idx]: null });
+      const data = await response.json();
+      const fullText = data.content
+        .map(b => (b.type === 'text' && b.text) ? b.text : '')
+        .filter(Boolean)
+        .join('\n');
+
+      const parsed = parseScenarioMarkdown(fullText);
+      if (!parsed.name) {
+        throw new Error('Could not extract scenario from response');
+      }
+
+      setGeneratedScenarios({ ...generatedScenarios, [idx]: parsed });
+      // If user hasn't named the seed yet, populate from the AI name
+      if (!seedNames[idx] && parsed.name) {
+        setSeedNames({ ...seedNames, [idx]: parsed.name });
+      }
     } catch (err) {
-      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Could not build prompt' });
+      setGenerationErrors({ ...generationErrors, [idx]: err.message || 'Generation failed' });
+    } finally {
+      setGeneratingIdx(null);
     }
   };
 
@@ -1848,8 +2749,14 @@ Return ONLY the JSON. No backticks, no explanation, no markdown.`;
         <ContextSummary purpose={purpose} audiencePreset={audiencePreset} audienceCustom={audienceCustom} documents={documents} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-2 gap-3 ${vetoes && vetoes.size > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
         <StatBox label="Seed space" value={seedSpace.total.toLocaleString()} />
+        {vetoes && vetoes.size > 0 && (
+          <StatBox
+            label="Vetoed out"
+            value={vetoSurvivors ? (seedSpace.total - vetoSurvivors.seeds.length).toLocaleString() : '—'}
+          />
+        )}
         <StatBox label="Above coherence" value={filteredSeeds.length.toLocaleString()} />
         <StatBox label="Filter rate" value={`${((filteredSeeds.length / seedSpace.total) * 100).toFixed(0)}%`} />
         <StatBox label="Selected" value={selectedSeeds.length} highlight />
@@ -1953,9 +2860,12 @@ Return ONLY the JSON. No backticks, no explanation, no markdown.`;
                 })}
               </div>
 
-              {/* AI Prompt Download */}
+              {/* AI Generation Panel */}
               <AIScenarioPanel
                 seedIdx={idx}
+                color={color}
+                generatedScenarios={generatedScenarios}
+                generatingIdx={generatingIdx}
                 generationErrors={generationErrors}
                 onGenerate={() => generateScenario(idx)}
               />
@@ -1976,27 +2886,148 @@ Return ONLY the JSON. No backticks, no explanation, no markdown.`;
   );
 }
 
-function AIScenarioPanel({ seedIdx, generationErrors, onGenerate }) {
+function AIScenarioPanel({ seedIdx, color, generatedScenarios, generatingIdx, generationErrors, onGenerate }) {
+  const scenario = generatedScenarios[seedIdx];
+  const isGenerating = generatingIdx === seedIdx;
   const error = generationErrors[seedIdx];
+  const isOtherGenerating = generatingIdx !== null && generatingIdx !== seedIdx;
 
+  if (isGenerating) {
+    return (
+      <div className="px-6 py-5 border-t border-slate-800 bg-slate-950/50">
+        <div className="flex items-center gap-3 text-amber-300">
+          <Loader2 size={16} className="animate-spin" />
+          <div className="text-sm font-mono">Generating scenario from seed parameters…</div>
+        </div>
+        <div className="text-xs text-slate-600 mt-2 ml-7">Sending factors, weights, criticalities, coupling, and arrival timing to the model.</div>
+      </div>
+    );
+  }
+
+  if (!scenario) {
+    return (
+      <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+        <div className="text-xs text-slate-500">
+          {error ? (
+            <span className="text-rose-400">Generation failed: {error}</span>
+          ) : (
+            <span>No narrative yet. The seed parameters above can be expanded into a full scenario.</span>
+          )}
+        </div>
+        <button
+          onClick={onGenerate}
+          disabled={isOtherGenerating}
+          className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition
+            ${isOtherGenerating
+              ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+              : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40'
+            }`}
+        >
+          <Wand2 size={14} />
+          {error ? 'Try again' : 'Generate with AI'}
+        </button>
+      </div>
+    );
+  }
+
+  // Scenario rendered
   return (
-    <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between gap-4 flex-wrap">
-      <div className="text-xs text-slate-500">
-        {error ? (
-          <span className="text-rose-400">Could not build prompt: {error}</span>
-        ) : (
-          <span>Download the prompt as a text file, then paste it into your preferred LLM.</span>
+    <div className="border-t border-slate-800 bg-slate-950/40">
+      <div className="px-6 py-5 space-y-5">
+        <div className="flex items-baseline justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-xs font-mono uppercase tracking-wider mb-1" style={{ color }}>AI-generated scenario</div>
+            <div className="font-display text-2xl text-slate-50 leading-tight">{scenario.name}</div>
+            {scenario.tagline && (
+              <div className="text-sm text-slate-400 italic mt-1">{scenario.tagline}</div>
+            )}
+          </div>
+          <button
+            onClick={onGenerate}
+            disabled={isOtherGenerating}
+            className="flex items-center gap-1.5 text-xs font-mono text-slate-500 hover:text-amber-300 transition disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={11} /> regenerate
+          </button>
+        </div>
+
+        {scenario.narrative && (
+          <MarkdownProse text={scenario.narrative} />
+        )}
+
+        {scenario.tension && (
+          <div className="border-l-2 pl-4 py-1" style={{ borderColor: color }}>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Structural tension</div>
+            <MarkdownProse text={scenario.tension} />
+          </div>
+        )}
+
+        {Array.isArray(scenario.signals) && scenario.signals.length > 0 && (
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-2">Observable signals</div>
+            <ul className="space-y-1.5">
+              {scenario.signals.map((sig, i) => (
+                <li key={i} className="text-sm text-slate-300 flex gap-2">
+                  <span className="text-slate-600 font-mono text-xs flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                  <span>{renderInlineMarkdown(sig)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {scenario.implications && (
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1">Strategic implications</div>
+            <MarkdownProse text={scenario.implications} />
+          </div>
         )}
       </div>
-      <button
-        onClick={onGenerate}
-        className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40"
-      >
-        <FileText size={14} />
-        Download AI prompt
-      </button>
     </div>
   );
+}
+
+// Render markdown prose — paragraphs separated by blank lines, with inline bold/italic.
+function MarkdownProse({ text }) {
+  if (!text) return null;
+  const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  return (
+    <div className="text-sm text-slate-300 leading-relaxed space-y-3">
+      {paragraphs.map((p, i) => (
+        <p key={i}>{renderInlineMarkdown(p)}</p>
+      ))}
+    </div>
+  );
+}
+
+// Inline markdown: **bold**, *italic*, _italic_. Returns React fragments.
+function renderInlineMarkdown(text) {
+  if (!text) return null;
+  // Tokenise on the markers we care about.
+  // We do this in two passes: bold first, then italic, since ** must not be split as *.
+  const parts = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
+  let lastIdx = 0;
+  let match;
+  let key = 0;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(text.slice(lastIdx, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      parts.push(<strong key={key++} className="font-semibold text-slate-100">{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('*') && token.endsWith('*')) {
+      parts.push(<em key={key++} className="italic">{token.slice(1, -1)}</em>);
+    } else if (token.startsWith('_') && token.endsWith('_')) {
+      parts.push(<em key={key++} className="italic">{token.slice(1, -1)}</em>);
+    }
+    lastIdx = match.index + token.length;
+  }
+  if (lastIdx < text.length) {
+    parts.push(text.slice(lastIdx));
+  }
+  return parts.length > 0 ? parts : text;
 }
 
 function ContextSummary({ purpose, audiencePreset, audienceCustom, documents }) {
