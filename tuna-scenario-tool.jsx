@@ -2078,7 +2078,9 @@ function StepIntro({ onBegin }) {
               <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
             </button>
             <a
-              href="#"
+              href="/TUNA_Scenario_Finder.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 text-[14px] font-medium text-surface-base py-[11px] border-b border-surface-base/50 hover:border-surface-base transition-all hover:gap-3"
             >
               Read the methodology paper
