@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AiTAM — Smart AI investment decisions · Peter Verster</title>
+<meta name="description" content="AiTAM scores every AI initiative through six lenses that matter — strategy, stakeholders, risk, returns, readiness and criticality — so the money lands where the value is." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --tw-accent: #ff3a05;
+  --tw-accent-deep: #e63200;
+  --tw-section-pad: 120px;
+  --tw-hero-pad: 88px;
+  --tw-paper: #fafaf8;
+  --tw-paper-2: #f3f2ee;
+  --tw-line-soft: #e5e3dc;
+  --tw-line: #d8d6cf;
+
+  --fire: var(--tw-accent);
+  --fire-deep: var(--tw-accent-deep);
+  --slate: #2e2e36;
+  --ink: #1a1a20;
+  --ink-2: #4a4a55;
+  --ink-3: #82828c;
+  --ink-4: #b4b4bc;
+  --paper: var(--tw-paper);
+  --paper-2: var(--tw-paper-2);
+  --paper-3: #ebeae5;
+  --line: var(--tw-line);
+  --line-soft: var(--tw-line-soft);
+  --white: #ffffff;
+
+  --sig-strategy:    #387ca5;
+  --sig-creation:    #266e4b;
+  --sig-erosion:     #c85c28;
+  --sig-impact:      #af8200;
+  --sig-realisation: #5b50ae;
+  --sig-criticality: #1a1a20;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.5;
+}
+.mono { font-family: 'Noto Sans Mono', ui-monospace, Menlo, monospace; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: 0; background: none; }
+
+/* ---------- Header ---------- */
+.site-header {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(250, 250, 248, 0.85);
+  backdrop-filter: saturate(180%) blur(10px);
+  -webkit-backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.site-header__inner {
+  max-width: 1240px; margin: 0 auto;
+  padding: 18px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px;
+}
+.wordmark { display: flex; align-items: baseline; gap: 12px; }
+.wordmark__name { font-weight: 600; font-size: 16px; letter-spacing: -0.01em; color: var(--ink); }
+.wordmark__rule { display: inline-block; width: 22px; height: 1px; background: var(--ink-3); margin: 0 4px 4px; }
+.wordmark__role { font-family: 'Noto Sans Mono', monospace; font-size: 11px; color: var(--ink-3); letter-spacing: 0.04em; }
+.nav { display: flex; align-items: center; gap: 28px; }
+.nav__link { font-size: 13px; color: var(--ink-2); font-weight: 500; transition: color .15s ease; }
+.nav__link:hover { color: var(--ink); }
+.nav__cta {
+  font-size: 13px; font-weight: 500; color: var(--ink);
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--white); transition: all .15s ease;
+}
+.nav__cta:hover { border-color: var(--ink); }
+
+/* ---------- Hero ---------- */
+.hero { padding: var(--tw-hero-pad, 88px) 32px 96px; }
+.hero__inner {
+  max-width: 1240px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 80px; align-items: start;
+}
+@media (max-width: 1040px) { .hero__inner { grid-template-columns: 1fr; gap: 56px; } }
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-2); letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 7px 12px 7px 10px;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+}
+.eyebrow__dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--fire);
+  box-shadow: 0 0 0 4px rgba(255, 58, 5, 0.12);
+}
+
+.hero__headline {
+  margin: 28px 0 0;
+  font-weight: 500;
+  font-size: clamp(40px, 5vw, 68px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  max-width: 18ch;
+  text-wrap: pretty;
+}
+.hero__headline .fire { color: var(--fire); font-weight: 600; }
+.hero__deck {
+  margin: 28px 0 0;
+  font-size: clamp(18px, 1.6vw, 22px);
+  line-height: 1.45;
+  color: var(--ink-2);
+  font-weight: 400;
+  max-width: 40ch;
+  text-wrap: pretty;
+}
+.hero__deck strong { color: var(--ink); font-weight: 500; }
+
+.hero__cta-row { margin-top: 40px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px;
+  background: var(--fire); color: var(--white);
+  font-size: 15px; font-weight: 500; letter-spacing: -0.005em;
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 6px 18px -8px rgba(255, 58, 5, 0.55);
+  transition: all .15s ease;
+}
+.btn-primary:hover {
+  background: var(--fire-deep); transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 10px 22px -8px rgba(255, 58, 5, 0.6);
+}
+.btn-primary svg { transition: transform .2s ease; }
+.btn-primary:hover svg { transform: translateX(3px); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 500; color: var(--ink);
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--ink);
+  transition: gap .15s ease;
+}
+.btn-secondary:hover { gap: 12px; }
+
+.hero__meta {
+  margin-top: 28px;
+  display: flex; gap: 18px; flex-wrap: wrap;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11.5px;
+  color: var(--ink-3); letter-spacing: 0.02em;
+}
+.hero__meta span { display: inline-flex; align-items: center; gap: 8px; }
+.hero__meta span:not(:last-child)::after {
+  content: ''; width: 3px; height: 3px; background: var(--ink-4); border-radius: 50%;
+  margin-left: 18px;
+}
+
+/* ---------- Equation card ---------- */
+.equation-card {
+  margin-top: 56px;
+  padding: 24px 28px;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  position: relative;
+}
+.equation-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--fire); border-radius: 3px 0 0 3px;
+}
+.equation-card__label {
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.equation {
+  margin-top: 14px;
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+.equation .net      { color: var(--fire); font-weight: 500; }
+.equation .potential{ color: var(--ink); font-weight: 500; }
+.equation .realisation { color: var(--ink); }
+.equation .erosion  { color: var(--ink); }
+.equation .op { color: var(--ink-3); padding: 0 4px; }
+.equation .paren { color: var(--ink-4); }
+
+/* ---------- Hero visual: AHP dimension stack ---------- */
+.hero-visual {
+  position: relative;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 30px 60px -40px rgba(46, 46, 54, 0.18);
+}
+.hv__chrome {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line-soft);
+}
+.hv__title {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-2); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.hv__step {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-3);
+}
+.hv__step b { color: var(--fire); font-weight: 500; }
+
+.hv__legend {
+  display: flex; justify-content: space-between;
+  font-family: 'Noto Sans Mono', monospace; font-size: 10px;
+  color: var(--ink-3); letter-spacing: 0.04em; text-transform: uppercase;
+  padding-top: 18px;
+}
+
+.hv__bars {
+  margin-top: 10px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.hv__bar-row {
+  display: grid; grid-template-columns: 132px 1fr 44px;
+  gap: 12px; align-items: center;
+}
+.hv__bar-label {
+  font-size: 12px; color: var(--ink-2); font-weight: 500;
+}
+.hv__bar-track {
+  height: 8px; background: var(--paper-2);
+  border-radius: 999px; position: relative; overflow: hidden;
+}
+.hv__bar-fill {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  border-radius: 999px;
+  background: var(--ink);
+}
+.hv__bar-fill.is-peak { background: var(--fire); }
+.hv__bar-weight {
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-3); text-align: right;
+}
+.hv__bar-weight.is-peak { color: var(--fire); font-weight: 500; }
+
+.hv__pulse {
+  position: relative; height: 1px; margin: 18px -22px 0;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+}
+.hv__pulse::after {
+  content: ''; position: absolute; left: 0; top: -1px; height: 3px; width: 60px;
+  background: linear-gradient(90deg, transparent, var(--fire), transparent);
+  animation: hvpulse 5s linear infinite;
+}
+@keyframes hvpulse {
+  0% { left: -60px; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.hv__caption {
+  margin-top: 14px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--ink-3);
+}
+.hv__seed {
+  display: inline-flex; gap: 4px; align-items: center;
+  padding: 4px 8px; background: var(--paper-2); border-radius: 4px;
+  border: 1px solid var(--line-soft);
+}
+
+/* ---------- Audience strip ---------- */
+.audience-strip {
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 22px 32px;
+  background: var(--paper-2);
+}
+.audience-strip__inner {
+  max-width: 1240px; margin: 0 auto;
+  display: flex; align-items: center; gap: 32px; flex-wrap: wrap;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11.5px;
+  color: var(--ink-2); letter-spacing: 0.04em;
+}
+.audience-strip__label { color: var(--ink-3); text-transform: uppercase; font-size: 10.5px; }
+.audience-strip__items { display: flex; gap: 24px; flex-wrap: wrap; }
+.audience-strip__items span { color: var(--ink); font-weight: 500; }
+
+/* ---------- Section common ---------- */
+.section { padding: var(--tw-section-pad, 120px) 32px; }
+.section__inner { max-width: 1100px; margin: 0 auto; }
+.section-eyebrow {
+  display: inline-flex; align-items: center; gap: 12px;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--fire); letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 32px;
+}
+.section-eyebrow::before { content: ''; width: 28px; height: 1px; background: var(--fire); }
+.section-title {
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  max-width: 22ch;
+  margin: 0 0 24px;
+  text-wrap: balance;
+}
+.section-lead {
+  font-size: 17px; line-height: 1.55; color: var(--ink-2);
+  max-width: 65ch; margin: 0;
+  text-wrap: pretty;
+}
+
+/* ---------- Problem cards ---------- */
+.problem-grid {
+  margin-top: 64px;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 880px) { .problem-grid { grid-template-columns: 1fr; } }
+.problem-card {
+  position: relative;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 32px 28px 28px;
+  transition: all .2s ease;
+}
+.problem-card:hover {
+  border-color: var(--line);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 24px 40px -28px rgba(46, 46, 54, 0.2);
+}
+.problem-card__num {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 22px;
+}
+.problem-card__num::before {
+  content: ''; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--accent, var(--fire));
+}
+.problem-card__title {
+  font-size: 19px; line-height: 1.3; font-weight: 600;
+  letter-spacing: -0.015em; color: var(--ink);
+  margin: 0 0 12px;
+}
+.problem-card__body { font-size: 14.5px; line-height: 1.55; color: var(--ink-2); margin: 0; }
+.problem-card__tag {
+  margin-top: 22px; padding-top: 18px;
+  border-top: 1px dashed var(--line-soft);
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--accent, var(--fire));
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+/* ---------- Framework section ---------- */
+.framework-section {
+  background: var(--paper-2);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.dim-grid {
+  margin-top: 64px;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 980px) { .dim-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .dim-grid { grid-template-columns: 1fr; } }
+
+.dim-card {
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 22px 22px 20px;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.dim-card__head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; margin-bottom: 16px;
+}
+.dim-card__num {
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-3); letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 8px;
+}
+.dim-card__num::before {
+  content: ''; width: 8px; height: 8px; border-radius: 2px;
+  background: var(--dim-accent, var(--fire));
+}
+.dim-card__weight {
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-2); padding: 3px 7px;
+  background: var(--paper-2); border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+.dim-card__weight.peak { color: var(--fire); border-color: rgba(255,58,5,0.25); background: rgba(255,58,5,0.06); }
+
+.dim-card__title {
+  font-size: 17px; font-weight: 600; letter-spacing: -0.015em;
+  color: var(--ink); margin: 0 0 10px;
+  line-height: 1.25;
+}
+.dim-card__desc {
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-2); margin: 0 0 16px;
+  text-wrap: pretty;
+}
+.dim-card__crits {
+  margin-top: auto;
+  padding-top: 14px; border-top: 1px dashed var(--line-soft);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.dim-crit {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-2); letter-spacing: 0.01em;
+}
+.dim-crit::before {
+  content: ''; width: 3px; height: 3px; border-radius: 50%;
+  background: var(--ink-4); flex-shrink: 0;
+}
+
+/* ---------- Method (DSS flow) ---------- */
+.dss-flow {
+  margin-top: 64px;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+@media (max-width: 960px) { .dss-flow { grid-template-columns: repeat(2, 1fr); } }
+.dss-step {
+  padding: 26px 22px;
+  border-right: 1px solid var(--line-soft);
+  position: relative;
+}
+.dss-step:last-child { border-right: 0; }
+@media (max-width: 960px) {
+  .dss-step:nth-child(even) { border-right: 0; }
+  .dss-step { border-bottom: 1px solid var(--line-soft); }
+  .dss-step:nth-last-child(-n+2) { border-bottom: 0; }
+}
+.dss-step__num {
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-3); letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 18px;
+}
+.dss-step__num::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--fire);
+}
+.dss-step__title {
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--ink); margin: 0 0 8px;
+}
+.dss-step__desc {
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-2);
+  margin: 0;
+}
+.dss-step__hint {
+  margin-top: 14px;
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--ink-3); letter-spacing: 0.04em;
+}
+
+/* ---------- Output preview ---------- */
+.output-section { }
+.output-grid {
+  margin-top: 64px;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 32px; align-items: start;
+}
+@media (max-width: 920px) { .output-grid { grid-template-columns: 1fr; } }
+
+.ranking-table {
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 22px;
+}
+.ranking-table__head {
+  display: grid; grid-template-columns: 28px 1fr 70px 80px;
+  gap: 12px; align-items: center;
+  padding-bottom: 12px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.rank-row {
+  display: grid; grid-template-columns: 28px 1fr 70px 80px;
+  gap: 12px; align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--line-soft);
+}
+.rank-row:last-child { border-bottom: 0; }
+.rank-row__rk {
+  font-family: 'Noto Sans Mono', monospace; font-size: 12px;
+  color: var(--ink-3);
+}
+.rank-row__name {
+  font-size: 13.5px; font-weight: 500; color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.rank-row__bar {
+  height: 6px; background: var(--paper-2);
+  border-radius: 999px; overflow: hidden;
+}
+.rank-row__bar > i {
+  display: block; height: 100%;
+  background: var(--ink); border-radius: 999px;
+}
+.rank-row.is-top .rank-row__bar > i { background: var(--fire); }
+.rank-row.is-top .rank-row__rk { color: var(--fire); font-weight: 500; }
+.rank-row__score {
+  font-family: 'Noto Sans Mono', monospace; font-size: 12.5px;
+  color: var(--ink); text-align: right; font-weight: 500;
+}
+.rank-row.is-top .rank-row__score { color: var(--fire); }
+
+.output-figure {
+  background: var(--white); border: 1px solid var(--line-soft);
+  border-radius: 10px; padding: 22px;
+}
+.output-figure__title {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-2); letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0 0 16px;
+}
+
+/* ---------- Differences section (dark) ---------- */
+.diff-section {
+  padding: var(--tw-section-pad, 120px) 32px;
+  background: var(--ink); color: var(--paper);
+}
+.diff-section__inner { max-width: 1100px; margin: 0 auto; }
+.diff-section .section-eyebrow { color: var(--fire); }
+.diff-section .section-eyebrow::before { background: var(--fire); }
+.diff-section .section-title { color: var(--paper); }
+.diff-section .section-lead { color: rgba(250, 250, 248, 0.7); max-width: 65ch; }
+
+.diff-grid {
+  margin-top: 64px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+}
+@media (max-width: 760px) { .diff-grid { grid-template-columns: 1fr; } }
+.diff-card {
+  position: relative;
+  padding: 36px 32px 32px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  transition: all .2s ease;
+}
+.diff-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-2px);
+}
+.diff-card__num {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; letter-spacing: 0.06em; color: var(--fire);
+  margin-bottom: 24px;
+  display: flex; align-items: center; gap: 10px;
+}
+.diff-card__num::before {
+  content: ''; width: 22px; height: 1px; background: var(--fire);
+}
+.diff-card__title {
+  font-size: 22px; line-height: 1.25; font-weight: 500;
+  letter-spacing: -0.015em; color: var(--paper); margin: 0 0 14px;
+  text-wrap: balance;
+}
+.diff-card__title em { color: var(--fire); font-style: normal; font-weight: 500; }
+.diff-card__body {
+  font-size: 14.5px; line-height: 1.55;
+  color: rgba(250, 250, 248, 0.7);
+  margin: 0;
+  text-wrap: pretty;
+}
+.diff-card__body em { color: var(--paper); font-style: italic; }
+
+.diff-rule {
+  margin: 56px 0 0;
+  padding: 22px 26px;
+  border-left: 2px solid var(--fire);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 17px; line-height: 1.5;
+  color: var(--paper); font-weight: 400;
+  letter-spacing: -0.005em;
+  border-radius: 0 6px 6px 0;
+}
+.diff-rule strong { color: var(--fire); font-weight: 500; }
+
+/* ---------- Asymmetries section ---------- */
+.asym-list {
+  margin-top: 64px;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.asym-row {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 32px; align-items: center;
+  padding: 28px 30px;
+  border-top: 1px solid var(--line-soft);
+}
+.asym-row:first-child { border-top: 0; }
+@media (max-width: 820px) {
+  .asym-row { grid-template-columns: 1fr; gap: 16px; padding: 24px; }
+}
+.asym-row__head { display: flex; align-items: baseline; gap: 18px; }
+.asym-row__num {
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px;
+  color: var(--ink-3); letter-spacing: 0.06em; flex-shrink: 0;
+  padding-top: 4px;
+}
+.asym-row__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.asym-row__title {
+  font-size: 19px; line-height: 1.3; font-weight: 600;
+  letter-spacing: -0.015em; color: var(--ink); margin: 0;
+  text-wrap: balance;
+}
+.asym-row__title em { color: var(--fire); font-style: normal; }
+.asym-row__desc {
+  font-size: 14.5px; line-height: 1.5; color: var(--ink-2); margin: 0;
+}
+.asym-row__force {
+  background: var(--paper-2);
+  border-left: 2px solid var(--fire);
+  padding: 14px 18px;
+  border-radius: 0 6px 6px 0;
+}
+.asym-row__force-label {
+  font-family: 'Noto Sans Mono', monospace; font-size: 10.5px;
+  color: var(--fire); letter-spacing: 0.06em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.asym-row__force-text {
+  font-size: 14px; line-height: 1.45; color: var(--ink); font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.asym-coda {
+  margin-top: 36px;
+  font-size: 16px; line-height: 1.55; color: var(--ink-2);
+  max-width: 60ch;
+}
+.asym-coda strong { color: var(--ink); font-weight: 500; }
+
+/* ---------- CTA ---------- */
+.cta-section { padding: var(--tw-section-pad, 120px) 32px; background: var(--ink); color: var(--paper); }
+.cta-section__inner { max-width: 1100px; margin: 0 auto; }
+.cta-section .section-eyebrow { color: var(--fire); }
+.cta-section .section-eyebrow::before { background: var(--fire); }
+.cta-title {
+  font-size: clamp(34px, 4vw, 56px); line-height: 1.05;
+  letter-spacing: -0.025em; font-weight: 500; margin: 0 0 24px;
+  max-width: 20ch; text-wrap: balance;
+}
+.cta-title em { font-style: normal; color: var(--fire); }
+.cta-lead {
+  font-size: 17px; line-height: 1.55; color: rgba(250, 250, 248, 0.7);
+  max-width: 60ch; margin: 0 0 40px;
+}
+.cta-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.cta-row .btn-secondary { color: var(--paper); border-bottom-color: rgba(250,250,248,0.5); }
+.cta-row .btn-secondary:hover { border-bottom-color: var(--paper); }
+
+/* ---------- Footer ---------- */
+.footer { padding: 32px; border-top: 1px solid var(--line-soft); background: var(--paper); }
+.footer__inner {
+  max-width: 1240px; margin: 0 auto;
+  display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 18px;
+  font-family: 'Noto Sans Mono', monospace; font-size: 11px; color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+.footer a:hover { color: var(--ink); }
+.footer__nav { display: flex; gap: 24px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header__inner">
+    <div class="wordmark">
+      <span class="wordmark__name">Peter Verster</span>
+      <span class="wordmark__rule"></span>
+      <span class="wordmark__role">Smart AI Investments</span>
+    </div>
+    <nav class="nav">
+      <a class="nav__link" href="#problem">Why this matters</a>
+      <a class="nav__link" href="#differences">Why AI is different</a>
+      <a class="nav__link" href="#framework">The six lenses</a>
+      <a class="nav__link" href="#asymmetries">Asymmetries</a>
+      <a class="nav__link" href="#method">How it works</a>
+      <a class="nav__cta" href="#begin">Start →</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="hero__inner">
+    <div>
+      <div class="eyebrow">
+        <span class="eyebrow__dot"></span>
+        <span>For boards, CEOs and investors betting on AI</span>
+      </div>
+
+      <h1 class="hero__headline">
+        Smart AI investment decisions that <span class="fire">survive contact with reality</span>.
+      </h1>
+
+      <p class="hero__deck">
+        AI is different. Business cases that sell the upside and bury the bill lead to disappointment. <strong>AiTAM</strong> scores every initiative through 6 lenses that matter — strategy, stakeholders, risk, returns, readiness and criticality — and helps you make smart bets, so the money lands where the value is.
+      </p>
+
+      <div class="hero__cta-row">
+        <a class="btn-primary" href="#begin">
+          Score your portfolio
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+        </a>
+        <a class="btn-secondary" href="#output">
+          See a worked example
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <div class="hero__meta">
+        <span>Six lenses</span>
+        <span>Twenty-seven criteria</span>
+        <span>An audit trail behind every score</span>
+        <span>One ranked list</span>
+      </div>
+
+      <div class="equation-card" aria-label="What we actually rank on">
+        <div class="equation-card__label">What we actually rank on</div>
+        <div class="equation">
+          <span class="net">Real value</span>
+          <span class="op">=</span>
+          <span class="potential">upside</span>
+          <span class="op">−</span>
+          <span class="paren">(</span><span class="realisation">cost to deliver</span>
+          <span class="op">+</span>
+          <span class="erosion">risk to stakeholders</span><span class="paren">)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero visual: AHP-weighted dimension bars -->
+    <aside class="hero-visual" aria-label="AHP-weighted macro dimensions">
+      <div class="hv__chrome">
+        <div class="hv__title">How the six lenses weigh against each other</div>
+        <div class="hv__step">step <b>02 / 05</b></div>
+      </div>
+
+      <div class="hv__legend">
+        <span>Lens ↓</span>
+        <span>How much it counts →</span>
+      </div>
+
+      <div class="hv__bars">
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Strategy</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill" style="width: 56%"></div></div>
+          <div class="hv__bar-weight">0.15</div>
+        </div>
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Value</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill" style="width: 67%"></div></div>
+          <div class="hv__bar-weight">0.18</div>
+        </div>
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Risk</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill is-peak" style="width: 100%"></div></div>
+          <div class="hv__bar-weight is-peak">0.27</div>
+        </div>
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Returns</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill" style="width: 44%"></div></div>
+          <div class="hv__bar-weight">0.12</div>
+        </div>
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Readiness</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill" style="width: 37%"></div></div>
+          <div class="hv__bar-weight">0.10</div>
+        </div>
+        <div class="hv__bar-row">
+          <div class="hv__bar-label">Criticality</div>
+          <div class="hv__bar-track"><div class="hv__bar-fill" style="width: 67%"></div></div>
+          <div class="hv__bar-weight">0.18</div>
+        </div>
+      </div>
+
+      <div class="hv__pulse"></div>
+
+      <div class="hv__caption">
+        <span>The risk lens carries the most weight — by design</span>
+        <span class="hv__seed">reference profile</span>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ===================== AUDIENCE STRIP ===================== -->
+<div class="audience-strip">
+  <div class="audience-strip__inner">
+    <span class="audience-strip__label">Used by</span>
+    <div class="audience-strip__items">
+      <span>Boards</span>
+      <span>CEOs and CFOs</span>
+      <span>PE and VC investment committees</span>
+      <span>Operating partners</span>
+      <span>Heads of AI</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PROBLEM ===================== -->
+<section class="section" id="problem">
+  <div class="section__inner">
+    <div class="section-eyebrow">Why this matters</div>
+    <h2 class="section-title">Most AI business cases would not survive a serious board meeting.</h2>
+    <p class="section-lead">
+      The first wave of enterprise AI is now being judged. The companies whose bets paid off had no special access to better algorithms. They made better tradeoffs at the moment of commitment. Three habits explain most of the disappointments.
+    </p>
+
+    <div class="problem-grid">
+      <article class="problem-card" style="--accent: var(--sig-erosion);">
+        <div class="problem-card__num">Habit 01</div>
+        <h3 class="problem-card__title">Counting the upside, ignoring the bill.</h3>
+        <p class="problem-card__body">A glossy ROI number wins the room. The change-management, the data work, the regulatory exposure and the reputational risk all arrive later — and quietly cancel the gain.</p>
+        <div class="problem-card__tag">Upside bias</div>
+      </article>
+
+      <article class="problem-card" style="--accent: var(--sig-impact);">
+        <div class="problem-card__num">Habit 02</div>
+        <h3 class="problem-card__title">One number, no reasoning.</h3>
+        <p class="problem-card__body">NPV answers one question. Boards ask many. Who sponsors it? Is the market ready? What breaks if it fails? Squash all of that into a single score and the only thing a director really wants — the reasoning behind the number — disappears.</p>
+        <div class="problem-card__tag">Lost reasoning</div>
+      </article>
+
+      <article class="problem-card" style="--accent: var(--sig-strategy);">
+        <div class="problem-card__num">Habit 03</div>
+        <h3 class="problem-card__title">Scored against a template, not a strategy.</h3>
+        <p class="problem-card__body">Generic scorecards reward generic projects. The investments that move a company are the ones tied to its specific bet — the customers it wants to keep, the partners it needs, the boundary it has to redraw.</p>
+        <div class="problem-card__tag">Off-strategy</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DIFFERENCES (dark) ===================== -->
+<section class="diff-section" id="differences">
+  <div class="diff-section__inner">
+    <div class="section-eyebrow">Where AI is different</div>
+    <h2 class="section-title">AI breaks the investment playbook in four specific ways.</h2>
+    <p class="section-lead">
+      Treating AI like any other capital decision is the most expensive mistake on the table. The economics are different. The risk profile is different. The thing you are actually buying is different. Four differences explain why most spreadsheets get it wrong.
+    </p>
+
+    <div class="diff-grid">
+      <article class="diff-card">
+        <div class="diff-card__num">Difference 01</div>
+        <h3 class="diff-card__title">You are buying a <em>domain</em>, not a tool.</h3>
+        <p class="diff-card__body">“AI” is to investments what “vehicles” is to logistics. A recommender, a credit-risk model and a coding assistant share a substrate and almost nothing else. They mature at different rates, fail in different ways and demand different complementary assets. Evaluating “an AI initiative” in general is a category error.</p>
+      </article>
+      <article class="diff-card">
+        <div class="diff-card__num">Difference 02</div>
+        <h3 class="diff-card__title">The asset compounds. <em>The bill arrives upfront.</em></h3>
+        <p class="diff-card__body">Data is the rare asset that gets <em>more</em> valuable as you use it. So do the routines, the talent and the customer trust built around it. The cost — clean data, scarce engineers, change management — lands in year one. The return, if you get the rest right, compounds for a decade. Standard NPV under-prices both ends.</p>
+      </article>
+      <article class="diff-card">
+        <div class="diff-card__num">Difference 03</div>
+        <h3 class="diff-card__title">Timing matters more than scale.</h3>
+        <p class="diff-card__body">Network effects and accumulation economics mean an eighteen-month lead is often unrecoverable. The investment question is rarely “is this worth doing?” — it is “is this worth doing <em>now</em>, before someone else builds the moat?” Most committees have no language for that question.</p>
+      </article>
+      <article class="diff-card">
+        <div class="diff-card__num">Difference 04</div>
+        <h3 class="diff-card__title">The risk is regulated faster than it is understood.</h3>
+        <p class="diff-card__body">Earlier technologies were judged by their winners. AI is being judged in real time by regulators, journalists and the courts — and the rules are moving faster than the technology. A model that worked yesterday can be unlawful tomorrow. The risk lens has to price that.</p>
+      </article>
+    </div>
+
+    <div class="diff-rule">
+      <strong>Rule of thumb.</strong> If your investment thesis would work just as well for a new ERP rollout, you are not yet thinking about AI.
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FRAMEWORK ===================== -->
+<section class="section framework-section" id="framework">
+  <div class="section__inner">
+    <div class="section-eyebrow">The six lenses</div>
+    <h2 class="section-title">Look at every AI bet through the six things that decide whether it pays off.</h2>
+    <p class="section-lead">
+      Score each initiative from zero to five through each lens. Risk is scored as a negative. The reference weights below come from years of AI engagements; tune them to your own appetite in an afternoon.
+    </p>
+
+    <div class="dim-grid">
+
+      <article class="dim-card" style="--dim-accent: var(--sig-strategy);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">01 · Strategy</div>
+          <div class="dim-card__weight">w 0.15</div>
+        </div>
+        <h3 class="dim-card__title">Does it move our strategy?</h3>
+        <p class="dim-card__desc">An investment that does not push the company toward what makes it valuable and hard to copy is a distraction — however clever the model.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Fit with the bet · 0.67</div>
+          <div class="dim-crit">Builds a hard-to-copy asset · 0.33</div>
+        </div>
+      </article>
+
+      <article class="dim-card" style="--dim-accent: var(--sig-creation);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">02 · Value Creation</div>
+          <div class="dim-card__weight">w 0.18</div>
+        </div>
+        <h3 class="dim-card__title">Who benefits, and by how much?</h3>
+        <p class="dim-card__desc">Customers, employees, regulators, owners — nine groups whose verdicts add up to whether the project lives or dies.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Customers · 0.18</div>
+          <div class="dim-crit">Regulators · 0.17</div>
+          <div class="dim-crit">Shareholders · 0.16</div>
+          <div class="dim-crit">Reputation · 0.11</div>
+          <div class="dim-crit">five more</div>
+        </div>
+      </article>
+
+      <article class="dim-card" style="--dim-accent: var(--sig-erosion);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">03 · Value Erosion</div>
+          <div class="dim-card__weight peak">w 0.27</div>
+        </div>
+        <h3 class="dim-card__title">What are the risks, and to whom?</h3>
+        <p class="dim-card__desc">The lens that carries the most weight — on purpose. AI risks do not stay in spreadsheets; they end up in regulators' inboxes and newspaper headlines.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Same nine groups, scored downward</div>
+          <div class="dim-crit">Forces you to name the risks</div>
+          <div class="dim-crit">Cancels optimism bias</div>
+        </div>
+      </article>
+
+      <article class="dim-card" style="--dim-accent: var(--sig-impact);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">04 · Business Impact</div>
+          <div class="dim-card__weight">w 0.12</div>
+        </div>
+        <h3 class="dim-card__title">Will it actually make money?</h3>
+        <p class="dim-card__desc">A simple cash view any CFO will recognise — and one that admits AI projects rarely earn back what the slide deck promised.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Cash returns · 0.36</div>
+          <div class="dim-crit">Speed to first revenue · 0.24</div>
+          <div class="dim-crit">Can we measure it · 0.20</div>
+          <div class="dim-crit">Work vs. reward · 0.20</div>
+        </div>
+      </article>
+
+      <article class="dim-card" style="--dim-accent: var(--sig-realisation);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">05 · Value Realisation</div>
+          <div class="dim-card__weight">w 0.10</div>
+        </div>
+        <h3 class="dim-card__title">Are we ready to land it?</h3>
+        <p class="dim-card__desc">A perfect idea executed by an unready organisation returns nothing. Sponsorship, skills, data, customers — present and accounted for, or not.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Executive sponsor · 0.29</div>
+          <div class="dim-crit">The business · 0.19</div>
+          <div class="dim-crit">The market · 0.18</div>
+          <div class="dim-crit">Data and talent · 0.15</div>
+          <div class="dim-crit">two more</div>
+        </div>
+      </article>
+
+      <article class="dim-card" style="--dim-accent: var(--sig-criticality);">
+        <div class="dim-card__head">
+          <div class="dim-card__num">06 · Criticality</div>
+          <div class="dim-card__weight">w 0.18</div>
+        </div>
+        <h3 class="dim-card__title">What breaks if it fails?</h3>
+        <p class="dim-card__desc">A model that helps a marketer write headlines is one thing. A model that decides who gets a loan is another. Criticality multiplies the cost — and the cost of getting it wrong.</p>
+        <div class="dim-card__crits">
+          <div class="dim-crit">Safety · 0.25</div>
+          <div class="dim-crit">Mission · 0.25</div>
+          <div class="dim-crit">Business · 0.25</div>
+          <div class="dim-crit">Reputation · 0.25</div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ASYMMETRIES ===================== -->
+<section class="section" id="asymmetries">
+  <div class="section__inner">
+    <div class="section-eyebrow">The asymmetries</div>
+    <h2 class="section-title">AI returns are lopsided. Plan for the lopsidedness.</h2>
+    <p class="section-lead">
+      AI investments rarely produce average returns. They produce wins that compound and failures that linger. Five asymmetries explain why the same technology, deployed by two different companies, can return a multiple of capital for one and a regulatory fine for the other.
+    </p>
+
+    <div class="asym-list">
+      <article class="asym-row">
+        <div class="asym-row__head">
+          <div class="asym-row__num">01</div>
+          <div class="asym-row__body">
+            <h3 class="asym-row__title">Upside is private. <em>Risk is public.</em></h3>
+            <p class="asym-row__desc">Productivity gains stay inside the P&amp;L. The harms — a biased decision, a leaked dataset, a hallucinated quote — leave the building immediately.</p>
+          </div>
+        </div>
+        <div class="asym-row__force">
+          <div class="asym-row__force-label">What it forces</div>
+          <div class="asym-row__force-text">Score risk as a negative number, not a footnote.</div>
+        </div>
+      </article>
+
+      <article class="asym-row">
+        <div class="asym-row__head">
+          <div class="asym-row__num">02</div>
+          <div class="asym-row__body">
+            <h3 class="asym-row__title">The same tool, <em>opposite outcomes.</em></h3>
+            <p class="asym-row__desc">A coding assistant makes senior engineers more valuable and junior engineers less so. The headline (“AI replaces engineers”) hides both effects and gets the strategy backwards.</p>
+          </div>
+        </div>
+        <div class="asym-row__force">
+          <div class="asym-row__force-label">What it forces</div>
+          <div class="asym-row__force-text">Decide which tasks you are automating, not which jobs.</div>
+        </div>
+      </article>
+
+      <article class="asym-row">
+        <div class="asym-row__head">
+          <div class="asym-row__num">03</div>
+          <div class="asym-row__body">
+            <h3 class="asym-row__title">Procurement is fast. <em>Adoption is slow.</em></h3>
+            <p class="asym-row__desc">The licence is signed in a quarter. The behaviour change takes three years. Most of the gap is where the business case quietly dies.</p>
+          </div>
+        </div>
+        <div class="asym-row__force">
+          <div class="asym-row__force-label">What it forces</div>
+          <div class="asym-row__force-text">Budget the people-change at the same line as the licence.</div>
+        </div>
+      </article>
+
+      <article class="asym-row">
+        <div class="asym-row__head">
+          <div class="asym-row__num">04</div>
+          <div class="asym-row__body">
+            <h3 class="asym-row__title">Early leads compound. <em>Followers do not catch up.</em></h3>
+            <p class="asym-row__desc">Data accumulates. Talent clusters. Customer trust hardens. By the time the second-mover has a working model, the first-mover has a moat.</p>
+          </div>
+        </div>
+        <div class="asym-row__force">
+          <div class="asym-row__force-label">What it forces</div>
+          <div class="asym-row__force-text">Treat timing as a first-class criterion, alongside ROI.</div>
+        </div>
+      </article>
+
+      <article class="asym-row">
+        <div class="asym-row__head">
+          <div class="asym-row__num">05</div>
+          <div class="asym-row__body">
+            <h3 class="asym-row__title">Vendors sell capability. <em>Markets buy outcomes.</em></h3>
+            <p class="asym-row__desc">The capability is real; the outcome depends on the data you do not have, the talent you cannot hire and the process you have not yet redesigned.</p>
+          </div>
+        </div>
+        <div class="asym-row__force">
+          <div class="asym-row__force-label">What it forces</div>
+          <div class="asym-row__force-text">Score what you will deliver — not what the demo did.</div>
+        </div>
+      </article>
+    </div>
+
+    <p class="asym-coda">
+      Each of these asymmetries maps to one of the six lenses. <strong>The framework exists to make sure none of them is left out of the meeting.</strong>
+    </p>
+  </div>
+</section>
+
+<!-- ===================== METHOD / DSS FLOW ===================== -->
+<section class="section" id="method">
+  <div class="section__inner">
+    <div class="section-eyebrow">How it works</div>
+    <h2 class="section-title">Five steps from a pile of ideas to a ranked portfolio.</h2>
+    <p class="section-lead">
+      No magic, no black boxes. Every step is a conversation you can hold in a workshop, recorded against the scoresheet so the reasoning survives the meeting and the board pack writes itself.
+    </p>
+
+    <div class="dss-flow">
+      <div class="dss-step">
+        <div class="dss-step__num">Step 01</div>
+        <h3 class="dss-step__title">Name the bet</h3>
+        <p class="dss-step__desc">Write down, in plain English, the strategic move the company is making. Everything that follows is scored against it.</p>
+        <div class="dss-step__hint">half a day</div>
+      </div>
+      <div class="dss-step">
+        <div class="dss-step__num">Step 02</div>
+        <h3 class="dss-step__title">Set the weights</h3>
+        <p class="dss-step__desc">Compare the lenses two at a time. The arithmetic turns those judgements into a defensible weighting your CFO will accept.</p>
+        <div class="dss-step__hint">a workshop</div>
+      </div>
+      <div class="dss-step">
+        <div class="dss-step__num">Step 03</div>
+        <h3 class="dss-step__title">Score each initiative</h3>
+        <p class="dss-step__desc">For every project, score it through each lens with the evidence to hand. Risk gets a negative score — no exceptions.</p>
+        <div class="dss-step__hint">one hour per project</div>
+      </div>
+      <div class="dss-step">
+        <div class="dss-step__num">Step 04</div>
+        <h3 class="dss-step__title">Rank the portfolio</h3>
+        <p class="dss-step__desc">The maths combines weights and scores into a single ranked list — with the reasoning preserved for every position.</p>
+        <div class="dss-step__hint">instant</div>
+      </div>
+      <div class="dss-step">
+        <div class="dss-step__num">Step 05</div>
+        <h3 class="dss-step__title">Decide and revisit</h3>
+        <p class="dss-step__desc">Fund the top of the list. Flag the critical projects for extra rigour. Re-score quarterly — markets move, weights shift.</p>
+        <div class="dss-step__hint">every quarter</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== OUTPUT ===================== -->
+<section class="section output-section framework-section" id="output">
+  <div class="section__inner">
+    <div class="section-eyebrow">An example</div>
+    <h2 class="section-title">What the board actually sees.</h2>
+    <p class="section-lead">
+      A ranked list of initiatives, and behind each one, a shape that tells you why it sits where it does. Strong on strategy, weak on readiness? You can see it. Brilliant returns sitting on a stack of regulatory risk? You can see that too. No more arguments about whose model is right — just a conversation about which lens you weight more heavily.
+    </p>
+
+    <div class="output-grid">
+      <div class="ranking-table">
+        <div class="ranking-table__head">
+          <span>#</span>
+          <span>Initiative</span>
+          <span>Score</span>
+          <span>Verdict</span>
+        </div>
+        <div class="rank-row is-top">
+          <div class="rank-row__rk">01</div>
+          <div class="rank-row__name">Precision livestock yield model</div>
+          <div class="rank-row__bar"><i style="width: 92%"></i></div>
+          <div class="rank-row__score">Fund</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-row__rk">02</div>
+          <div class="rank-row__name">Supply-chain demand forecasting</div>
+          <div class="rank-row__bar"><i style="width: 78%"></i></div>
+          <div class="rank-row__score">Fund</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-row__rk">03</div>
+          <div class="rank-row__name">Genomic trait selection assistant</div>
+          <div class="rank-row__bar"><i style="width: 64%"></i></div>
+          <div class="rank-row__score">Pilot</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-row__rk">04</div>
+          <div class="rank-row__name">Field-data ingest automation</div>
+          <div class="rank-row__bar"><i style="width: 52%"></i></div>
+          <div class="rank-row__score">Pilot</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-row__rk">05</div>
+          <div class="rank-row__name">Customer churn signal model</div>
+          <div class="rank-row__bar"><i style="width: 38%"></i></div>
+          <div class="rank-row__score">Hold</div>
+        </div>
+      </div>
+
+      <div class="output-figure">
+        <p class="output-figure__title">Why initiative 01 wins</p>
+        <svg viewBox="0 0 360 280" width="100%" height="280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="hex" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stop-color="#ff3a05" stop-opacity="0.18"/>
+              <stop offset="1" stop-color="#ff3a05" stop-opacity="0.05"/>
+            </linearGradient>
+          </defs>
+          <!-- Reference hexagons -->
+          <g fill="none" stroke="#e5e3dc" stroke-width="1">
+            <polygon points="180,40 296,106 296,238 180,304 64,238 64,106" transform="scale(0.85) translate(32, 14)"/>
+            <polygon points="180,68 271,120 271,224 180,276 89,224 89,120" transform="scale(0.85) translate(32, 14)"/>
+            <polygon points="180,96 246,134 246,210 180,248 114,210 114,134" transform="scale(0.85) translate(32, 14)"/>
+            <polygon points="180,124 221,148 221,196 180,220 139,196 139,148" transform="scale(0.85) translate(32, 14)"/>
+          </g>
+          <!-- Axis lines -->
+          <g stroke="#d8d6cf" stroke-width="1">
+            <line x1="185" y1="40" x2="185" y2="270" transform="translate(-5, 0)"/>
+            <line x1="65" y1="105" x2="295" y2="235" transform="translate(0, -3)"/>
+            <line x1="65" y1="235" x2="295" y2="105" transform="translate(0, -3)"/>
+          </g>
+          <!-- Opportunity polygon -->
+          <polygon
+            points="180,52 280,118 268,222 180,272 96,224 84,114"
+            transform="scale(0.85) translate(32, 14)"
+            fill="url(#hex)" stroke="#ff3a05" stroke-width="1.5"/>
+          <!-- Points -->
+          <g fill="#ff3a05">
+            <circle cx="185" cy="58" r="3"/>
+            <circle cx="270" cy="115" r="3"/>
+            <circle cx="260" cy="203" r="3"/>
+            <circle cx="185" cy="245" r="3"/>
+            <circle cx="103" cy="204" r="3"/>
+            <circle cx="93" cy="111" r="3"/>
+          </g>
+          <!-- Labels -->
+          <g font-family="Noto Sans Mono, monospace" font-size="9.5" fill="#4a4a55" letter-spacing="0.04em">
+            <text x="180" y="32" text-anchor="middle">STRATEGY · 4.5</text>
+            <text x="316" y="106" text-anchor="end">BENEFIT · 4.1</text>
+            <text x="316" y="248" text-anchor="end">CRITICALITY · 3.8</text>
+            <text x="180" y="276" text-anchor="middle">READINESS · 3.0</text>
+            <text x="44"  y="248">RETURNS · 3.2</text>
+            <text x="44"  y="106">RISK · −1.8</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CTA ===================== -->
+<section class="cta-section" id="begin">
+  <div class="cta-section__inner">
+    <div class="section-eyebrow">Start</div>
+    <h2 class="cta-title">Decide what to fund. <em>Defend it.</em></h2>
+    <p class="cta-lead">
+      Bring AiTAM into your next investment committee. We will weight the lenses with you, score your current portfolio in a workshop, and leave you with a ranked list, a board pack and a tool your team can run themselves next quarter.
+    </p>
+    <div class="cta-row">
+      <a class="btn-primary" href="#">
+        Book a working session
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+      </a>
+      <a class="btn-secondary" href="/">
+        Back to the TUNA Scenario Finder
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="footer">
+  <div class="footer__inner">
+    <div>© 2004–2026 Peter Verster · AiTAM™</div>
+    <nav class="footer__nav">
+      <a href="/">TUNA Scenario Finder</a>
+      <a href="#begin">Get in touch</a>
+      <a href="#">peterverster.com</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+// Smooth scroll for in-page anchor links
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const id = a.getAttribute('href');
+    if (id.length > 1) {
+      const el = document.querySelector(id);
+      if (el) {
+        e.preventDefault();
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 64, behavior: 'smooth' });
+      }
+    }
+  });
+});
+</script>
+</body>
+</html>
