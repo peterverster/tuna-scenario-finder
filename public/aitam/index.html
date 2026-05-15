@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AiTAM — Smart AI investment decisions · Peter Verster</title>
-<meta name="description" content="AiTAM scores every AI initiative through six lenses that matter — strategy, stakeholders, risk, returns, readiness and criticality — so the money lands where the value is." />
+<title>AiTAM — Find the fulcrum. Defend the bet. · Peter Verster</title>
+<meta name="description" content="Find the fulcrum. AiTAM is the decision system for boards and CEOs allocating AI capital — six lenses, twenty-seven criteria, one ranked list, and the audit trail to defend the bet to a regulator, a board, and a shareholder." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -198,6 +198,11 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 .equation .erosion  { color: var(--ink); }
 .equation .op { color: var(--ink-3); padding: 0 4px; }
 .equation .paren { color: var(--ink-4); }
+.equation-card__note {
+  margin: 14px 0 0;
+  font-size: 13.5px; line-height: 1.5; color: var(--ink-2);
+  max-width: 56ch;
+}
 
 /* ---------- Hero visual: AHP dimension stack ---------- */
 .hero-visual {
@@ -326,6 +331,91 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   text-wrap: pretty;
 }
 
+/* ---------- Fulcrum (Archimedes) section ---------- */
+.fulcrum-section {
+  padding: var(--tw-section-pad, 120px) 32px;
+  background: var(--paper);
+  border-top: 1px solid var(--line-soft);
+}
+.fulcrum-section__inner { max-width: 1100px; margin: 0 auto; }
+.fulcrum-quote {
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1.18; font-weight: 400; font-style: italic;
+  letter-spacing: -0.015em; color: var(--ink);
+  margin: 0 0 28px;
+  max-width: 32ch;
+  text-wrap: balance;
+}
+.fulcrum-quote em { font-style: italic; color: var(--ink); }
+.fulcrum-quote__attr {
+  display: block;
+  margin-top: 18px;
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em;
+  text-transform: uppercase; font-style: normal;
+}
+.fulcrum-lead {
+  font-size: 19px; line-height: 1.5; color: var(--ink-2);
+  max-width: 50ch; margin: 0 0 56px;
+}
+.fulcrum-lead strong { color: var(--ink); font-weight: 500; }
+
+.fulcrum-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+@media (max-width: 880px) { .fulcrum-grid { grid-template-columns: 1fr; } }
+.fulcrum-card {
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 36px 30px 32px;
+  position: relative;
+  transition: all .2s ease;
+}
+.fulcrum-card:hover {
+  border-color: var(--line);
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 24px 40px -28px rgba(46, 46, 54, 0.2);
+}
+.fulcrum-card__icon {
+  margin-bottom: 22px;
+  height: 36px;
+  display: flex; align-items: center;
+  color: var(--ink-3);
+}
+.fulcrum-card.is-fulcrum .fulcrum-card__icon { color: var(--fire); }
+.fulcrum-card__num {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+.fulcrum-card.is-fulcrum .fulcrum-card__num { color: var(--fire); }
+.fulcrum-card__title {
+  font-size: 22px; line-height: 1.2; font-weight: 600;
+  letter-spacing: -0.02em; color: var(--ink);
+  margin: 0 0 14px;
+}
+.fulcrum-card.is-fulcrum .fulcrum-card__title { color: var(--ink); }
+.fulcrum-card__body {
+  font-size: 15px; line-height: 1.55; color: var(--ink-2);
+  margin: 0;
+  text-wrap: pretty;
+}
+.fulcrum-card__body em { color: var(--ink); font-style: italic; }
+
+.fulcrum-closer {
+  margin: 56px auto 0;
+  text-align: left;
+  max-width: 38ch;
+  font-size: clamp(22px, 2.4vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.fulcrum-closer em { color: var(--fire); font-style: normal; font-weight: 500; }
+
 /* ---------- Problem cards ---------- */
 .problem-grid {
   margin-top: 64px;
@@ -369,6 +459,12 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   color: var(--accent, var(--fire));
   letter-spacing: 0.04em; text-transform: uppercase;
 }
+.problem-fulcrum-note {
+  font-size: 17px; line-height: 1.55; color: var(--ink-2);
+  max-width: 65ch; margin: 16px 0 0;
+  padding-left: 16px; border-left: 2px solid var(--fire);
+}
+.problem-fulcrum-note strong { color: var(--ink); font-weight: 500; }
 
 /* ---------- Framework section ---------- */
 .framework-section {
@@ -546,6 +642,15 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   font-size: 11px; color: var(--ink-2); letter-spacing: 0.06em; text-transform: uppercase;
   margin: 0 0 16px;
 }
+.output-closer {
+  margin-top: 36px;
+  font-size: 15.5px; line-height: 1.55;
+  color: var(--ink-2);
+  font-style: italic;
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.output-closer strong { color: var(--ink); font-style: normal; font-weight: 500; }
 
 /* ---------- Differences section (dark) ---------- */
 .diff-section {
@@ -611,6 +716,46 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 }
 .diff-rule strong { color: var(--fire); font-weight: 500; }
 
+.diff-closer {
+  margin-top: 32px;
+  font-size: 17px; line-height: 1.55;
+  color: rgba(250, 250, 248, 0.85);
+  max-width: 65ch;
+}
+.diff-closer strong { color: var(--paper); font-weight: 500; }
+
+/* ---------- Leverage pullquote section ---------- */
+.leverage-section {
+  padding: calc(var(--tw-section-pad, 120px) * 0.7) 32px;
+  background: var(--paper);
+  border-top: 1px solid var(--line-soft);
+}
+.leverage-section__inner { max-width: 1100px; margin: 0 auto; }
+.leverage-body p {
+  font-size: 17px; line-height: 1.6; color: var(--ink-2);
+  max-width: 65ch; margin: 0 0 18px;
+  text-wrap: pretty;
+}
+.leverage-body p strong { color: var(--ink); font-weight: 500; }
+.leverage-pullquote {
+  margin: 48px 0 0;
+  padding: 32px 36px;
+  background: var(--ink); color: var(--paper);
+  border-radius: 10px;
+  font-size: clamp(22px, 2.4vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 400; font-style: italic;
+  max-width: 50ch;
+  text-wrap: balance;
+  position: relative;
+}
+.leverage-pullquote::before {
+  content: ''; position: absolute; left: 0; top: 24px; bottom: 24px; width: 3px;
+  background: var(--fire); border-radius: 0 2px 2px 0;
+}
+.leverage-pullquote em { color: var(--fire); font-style: italic; }
+
 /* ---------- Asymmetries section ---------- */
 .asym-list {
   margin-top: 64px;
@@ -667,6 +812,82 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 }
 .asym-coda strong { color: var(--ink); font-weight: 500; }
 
+/* ---------- Metric section (dark) ---------- */
+.metric-section {
+  padding: var(--tw-section-pad, 120px) 32px;
+  background: var(--ink); color: var(--paper);
+}
+.metric-section__inner { max-width: 1100px; margin: 0 auto; }
+.metric-section .section-eyebrow { color: var(--fire); }
+.metric-section .section-eyebrow::before { background: var(--fire); }
+.metric-section .section-title { color: var(--paper); max-width: 22ch; }
+
+.metric-hero {
+  margin: 36px 0 56px;
+  padding: 36px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: clamp(26px, 3.4vw, 44px);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+  color: var(--paper);
+  max-width: 28ch;
+  text-wrap: balance;
+}
+.metric-hero em { color: var(--fire); font-style: normal; }
+
+.metric-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  margin-bottom: 56px;
+}
+@media (max-width: 760px) { .metric-cards { grid-template-columns: 1fr; } }
+.metric-card {
+  padding: 32px 28px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.metric-card.is-bad { border-color: rgba(255, 255, 255, 0.1); }
+.metric-card.is-good { border-color: rgba(255, 58, 5, 0.35); }
+.metric-card__threshold {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 14px; letter-spacing: 0.02em;
+  color: var(--paper); font-weight: 500;
+  margin-bottom: 14px;
+}
+.metric-card.is-good .metric-card__threshold { color: var(--fire); }
+.metric-card__title {
+  font-size: 20px; font-weight: 600; letter-spacing: -0.015em;
+  color: var(--paper); margin: 0 0 10px;
+}
+.metric-card__body {
+  font-size: 14.5px; line-height: 1.55;
+  color: rgba(250, 250, 248, 0.7);
+  margin: 0;
+}
+
+.metric-denials {
+  list-style: none; padding: 0; margin: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.metric-denials li {
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 18px; line-height: 1.3;
+  color: rgba(250, 250, 248, 0.55);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+.metric-denials li.is-final {
+  color: var(--fire);
+  font-weight: 500;
+  font-size: clamp(22px, 2.4vw, 30px);
+  letter-spacing: -0.015em;
+  padding-top: 26px;
+  border-bottom: 0;
+}
+
 /* ---------- CTA ---------- */
 .cta-section { padding: var(--tw-section-pad, 120px) 32px; background: var(--ink); color: var(--paper); }
 .cta-section__inner { max-width: 1100px; margin: 0 auto; }
@@ -710,9 +931,9 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     <nav class="nav">
       <a class="nav__link" href="#problem">Why this matters</a>
       <a class="nav__link" href="#differences">Why AI is different</a>
-      <a class="nav__link" href="#framework">The six lenses</a>
-      <a class="nav__link" href="#asymmetries">Asymmetries</a>
-      <a class="nav__link" href="#method">How it works</a>
+      <a class="nav__link" href="#fulcrum">Find the fulcrum</a>
+      <a class="nav__link" href="#framework">Six lenses</a>
+      <a class="nav__link" href="#metric">The metric</a>
       <a class="nav__cta" href="#begin">Start →</a>
     </nav>
   </div>
@@ -728,16 +949,16 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       </div>
 
       <h1 class="hero__headline">
-        Smart AI investment decisions that <span class="fire">survive contact with reality</span>.
+        Find the <span class="fire">fulcrum</span>. Defend the bet. Revalue the business.
       </h1>
 
       <p class="hero__deck">
-        AI is different. Business cases that sell the upside and bury the bill lead to disappointment. <strong>AiTAM</strong> scores every initiative through 6 lenses that matter — strategy, stakeholders, risk, returns, readiness and criticality — and helps you make smart bets, so the money lands where the value is.
+        Every AI portfolio has a long lever. Almost none of them have a fulcrum. <strong>AiTAM</strong> is the decision system that names the one to three places in your business model where AI must land — and gives you the audit trail to defend the bet to a regulator, a board, and a shareholder.
       </p>
 
       <div class="hero__cta-row">
         <a class="btn-primary" href="#begin">
-          Score your portfolio
+          Find your fulcrum
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
         </a>
         <a class="btn-secondary" href="#output">
@@ -753,17 +974,18 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
         <span>One ranked list</span>
       </div>
 
-      <div class="equation-card" aria-label="What we actually rank on">
-        <div class="equation-card__label">What we actually rank on</div>
+      <div class="equation-card" aria-label="The equation most AI business cases get wrong">
+        <div class="equation-card__label">The equation most AI business cases get wrong</div>
         <div class="equation">
-          <span class="net">Real value</span>
+          <span class="net">Net Value</span>
           <span class="op">=</span>
-          <span class="potential">upside</span>
+          <span class="potential">Value Potential</span>
           <span class="op">−</span>
-          <span class="paren">(</span><span class="realisation">cost to deliver</span>
+          <span class="paren">(</span><span class="realisation">Value Realisation Cost</span>
           <span class="op">+</span>
-          <span class="erosion">risk to stakeholders</span><span class="paren">)</span>
+          <span class="erosion">Stakeholder Value Erosion</span><span class="paren">)</span>
         </div>
+        <p class="equation-card__note">Most decks calculate term one. The board approves term one. The shareholders reckon with all three.</p>
       </div>
     </div>
 
@@ -836,6 +1058,60 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   </div>
 </div>
 
+<!-- ===================== FULCRUM (Archimedes) ===================== -->
+<section class="fulcrum-section" id="fulcrum">
+  <div class="fulcrum-section__inner">
+    <div class="section-eyebrow">The Archimedes problem</div>
+    <blockquote class="fulcrum-quote">
+      “Give me a lever long enough, a fulcrum on which to place it, and a place to stand, and I shall move the world.”
+      <span class="fulcrum-quote__attr">— Archimedes</span>
+    </blockquote>
+    <p class="fulcrum-lead">Most enterprise AI programmes have the lever. They are missing the other two.</p>
+
+    <div class="fulcrum-grid">
+      <article class="fulcrum-card">
+        <div class="fulcrum-card__icon" aria-hidden="true">
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.4">
+            <line x1="3" y1="15" x2="41" y2="15"/>
+            <line x1="3" y1="11" x2="3"  y2="19"/>
+            <line x1="41" y1="11" x2="41" y2="19"/>
+          </svg>
+        </div>
+        <div class="fulcrum-card__num">01</div>
+        <h3 class="fulcrum-card__title">The lever.</h3>
+        <p class="fulcrum-card__body">Capability, vendors, models, compute, talent. The list of forty use cases. Most companies have plenty.</p>
+      </article>
+
+      <article class="fulcrum-card is-fulcrum">
+        <div class="fulcrum-card__icon" aria-hidden="true">
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.6">
+            <line x1="4" y1="10" x2="40" y2="10"/>
+            <polygon points="22,11 30,26 14,26" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="fulcrum-card__num">02</div>
+        <h3 class="fulcrum-card__title">The fulcrum.</h3>
+        <p class="fulcrum-card__body">The one to three places in the business model where a one-percent movement compounds into outsized enterprise value. The <em>economic leverage point</em>. Most companies have never named theirs.</p>
+      </article>
+
+      <article class="fulcrum-card">
+        <div class="fulcrum-card__icon" aria-hidden="true">
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" stroke="currentColor" stroke-width="1.4">
+            <line x1="4" y1="22" x2="40" y2="22"/>
+            <rect x="14" y="14" width="16" height="8" fill="none"/>
+            <circle cx="22" cy="9" r="3" fill="none"/>
+          </svg>
+        </div>
+        <div class="fulcrum-card__num">03</div>
+        <h3 class="fulcrum-card__title">The place to stand.</h3>
+        <p class="fulcrum-card__body">The operator. The governance. The audit trail. The psychological safety to make a non-consensus bet and own it. Without it, the ground crumbles under whoever holds the lever.</p>
+      </article>
+    </div>
+
+    <p class="fulcrum-closer">AiTAM <em>names the fulcrum</em> and builds the place to stand. That is the whole product.</p>
+  </div>
+</section>
+
 <!-- ===================== PROBLEM ===================== -->
 <section class="section" id="problem">
   <div class="section__inner">
@@ -843,6 +1119,9 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     <h2 class="section-title">Most AI business cases would not survive a serious board meeting.</h2>
     <p class="section-lead">
       The first wave of enterprise AI is now being judged. The companies whose bets paid off had no special access to better algorithms. They made better tradeoffs at the moment of commitment. Three habits explain most of the disappointments.
+    </p>
+    <p class="problem-fulcrum-note">
+      All three habits below are forms of the same failure: <strong>nobody named the fulcrum</strong>. A use-case list is not a thesis. A scorecard is not a strategy. A template is not a leverage point.
     </p>
 
     <div class="problem-grid">
@@ -905,16 +1184,20 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     <div class="diff-rule">
       <strong>Rule of thumb.</strong> If your investment thesis would work just as well for a new ERP rollout, you are not yet thinking about AI.
     </div>
+
+    <p class="diff-closer">
+      These four differences make the spreadsheet obsolete. They do not make the decision impossible. They make it a different decision — one a generic ROI model cannot represent, and <strong>one a fulcrum-led framework can</strong>.
+    </p>
   </div>
 </section>
 
 <!-- ===================== FRAMEWORK ===================== -->
 <section class="section framework-section" id="framework">
   <div class="section__inner">
-    <div class="section-eyebrow">The six lenses</div>
-    <h2 class="section-title">Look at every AI bet through the six things that decide whether it pays off.</h2>
+    <div class="section-eyebrow">Six lenses to find the fulcrum</div>
+    <h2 class="section-title">Look at every AI bet through the six things that decide whether it is a fulcrum or a lever moving nothing.</h2>
     <p class="section-lead">
-      Score each initiative from zero to five through each lens. Risk is scored as a negative. The reference weights below come from years of AI engagements; tune them to your own appetite in an afternoon.
+      The six lenses are not a scoring exercise. They are a search procedure. Run an initiative through all six and what comes out the other side is the answer to one question: <em>is this a fulcrum, or is this a lever moving nothing?</em> Score each initiative from zero to five through each lens. Risk is scored as a negative. The reference weights below come from years of AI engagements; tune them to your own appetite in an afternoon.
     </p>
 
     <div class="dim-grid">
@@ -1012,11 +1295,27 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   </div>
 </section>
 
+<!-- ===================== LEVERAGE (what the lenses find) ===================== -->
+<section class="leverage-section" id="leverage">
+  <div class="leverage-section__inner">
+    <div class="section-eyebrow">The output</div>
+    <h2 class="section-title">What the six lenses are looking for.</h2>
+    <div class="leverage-body">
+      <p>Every business model has one to three places where, if AI moves the needle, the enterprise revalues. Freeport-McMoRan found theirs in concentrator yield. Toyota found theirs in supply-chain integration. Neither company deployed AI across the enterprise. They deployed it against the leverage point.</p>
+      <p>The leverage point is the <strong>fulcrum</strong>. The six lenses are the instruments that locate it.</p>
+      <p>Run a candidate initiative through the six lenses and one of two things happens. Either the scores converge — strategy fit is high, criticality is high, readiness is real, risk is named and priced — and you have found a fulcrum. Or the scores scatter, and what you have is a lever with nothing underneath it.</p>
+    </div>
+    <blockquote class="leverage-pullquote">
+      Concentration is the strategy. Most companies should leave a workshop with <em>one to three named fulcrums</em>, not forty ranked use cases.
+    </blockquote>
+  </div>
+</section>
+
 <!-- ===================== ASYMMETRIES ===================== -->
 <section class="section" id="asymmetries">
   <div class="section__inner">
-    <div class="section-eyebrow">The asymmetries</div>
-    <h2 class="section-title">AI returns are lopsided. Plan for the lopsidedness.</h2>
+    <div class="section-eyebrow">Why the lever needs a fulcrum</div>
+    <h2 class="section-title">Five reasons the lever alone will not move it.</h2>
     <p class="section-lead">
       AI investments rarely produce average returns. They produce wins that compound and failures that linger. Five asymmetries explain why the same technology, deployed by two different companies, can return a multiple of capital for one and a regulatory fine for the other.
     </p>
@@ -1094,7 +1393,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     </div>
 
     <p class="asym-coda">
-      Each of these asymmetries maps to one of the six lenses. <strong>The framework exists to make sure none of them is left out of the meeting.</strong>
+      Each asymmetry is a way the lever fails when no fulcrum is named. <strong>The framework exists to make sure none of them is left out of the meeting.</strong>
     </p>
   </div>
 </section>
@@ -1117,25 +1416,25 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       </div>
       <div class="dss-step">
         <div class="dss-step__num">Step 02</div>
-        <h3 class="dss-step__title">Set the weights</h3>
+        <h3 class="dss-step__title">Calibrate the lenses</h3>
         <p class="dss-step__desc">Compare the lenses two at a time. The arithmetic turns those judgements into a defensible weighting your CFO will accept.</p>
         <div class="dss-step__hint">a workshop</div>
       </div>
       <div class="dss-step">
         <div class="dss-step__num">Step 03</div>
-        <h3 class="dss-step__title">Score each initiative</h3>
+        <h3 class="dss-step__title">Test for fulcrum</h3>
         <p class="dss-step__desc">For every project, score it through each lens with the evidence to hand. Risk gets a negative score — no exceptions.</p>
         <div class="dss-step__hint">one hour per project</div>
       </div>
       <div class="dss-step">
         <div class="dss-step__num">Step 04</div>
-        <h3 class="dss-step__title">Rank the portfolio</h3>
+        <h3 class="dss-step__title">Concentrate the capital</h3>
         <p class="dss-step__desc">The maths combines weights and scores into a single ranked list — with the reasoning preserved for every position.</p>
         <div class="dss-step__hint">instant</div>
       </div>
       <div class="dss-step">
         <div class="dss-step__num">Step 05</div>
-        <h3 class="dss-step__title">Decide and revisit</h3>
+        <h3 class="dss-step__title">Stand on it</h3>
         <p class="dss-step__desc">Fund the top of the list. Flag the critical projects for extra rigour. Re-score quarterly — markets move, weights shift.</p>
         <div class="dss-step__hint">every quarter</div>
       </div>
@@ -1193,7 +1492,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       </div>
 
       <div class="output-figure">
-        <p class="output-figure__title">Why initiative 01 wins</p>
+        <p class="output-figure__title">Why initiative 01 is the fulcrum</p>
         <svg viewBox="0 0 360 280" width="100%" height="280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <defs>
             <linearGradient id="hex" x1="0" x2="1" y1="0" y2="1">
@@ -1240,6 +1539,43 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
         </svg>
       </div>
     </div>
+
+    <p class="output-closer">
+      <strong>Three of the five projects are levers. One is the fulcrum.</strong> That is a normal distribution, not a failure of imagination.
+    </p>
+  </div>
+</section>
+
+<!-- ===================== METRIC ===================== -->
+<section class="metric-section" id="metric">
+  <div class="metric-section__inner">
+    <div class="section-eyebrow">The metric</div>
+    <h2 class="section-title">The only AI metric I would put in front of a board.</h2>
+
+    <p class="metric-hero">
+      Capital allocated to <em>economic leverage points</em>, as a percentage of total AI spend.
+    </p>
+
+    <div class="metric-cards">
+      <article class="metric-card is-bad">
+        <div class="metric-card__threshold">Below 20%</div>
+        <h3 class="metric-card__title">Sprinkler.</h3>
+        <p class="metric-card__body">Your AI strategy is a sprinkler. Activity without revaluation. Budget without thesis.</p>
+      </article>
+      <article class="metric-card is-good">
+        <div class="metric-card__threshold">Above 60%</div>
+        <h3 class="metric-card__title">Defensibility.</h3>
+        <p class="metric-card__body">You are building real defensibility. Capital is concentrated where the business model revalues.</p>
+      </article>
+    </div>
+
+    <ul class="metric-denials">
+      <li>Not pilots launched.</li>
+      <li>Not models deployed.</li>
+      <li>Not employees trained.</li>
+      <li>Not dashboards built.</li>
+      <li class="is-final">Capital. On the fulcrum.</li>
+    </ul>
   </div>
 </section>
 
@@ -1247,9 +1583,9 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 <section class="cta-section" id="begin">
   <div class="cta-section__inner">
     <div class="section-eyebrow">Start</div>
-    <h2 class="cta-title">Decide what to fund. <em>Defend it.</em></h2>
+    <h2 class="cta-title">Find the fulcrum. <em>Defend the bet.</em></h2>
     <p class="cta-lead">
-      Bring AiTAM into your next investment committee. We will weight the lenses with you, score your current portfolio in a workshop, and leave you with a ranked list, a board pack and a tool your team can run themselves next quarter.
+      Bring AiTAM into your next investment committee. In one workshop we will calibrate the six lenses to your strategy, run your current portfolio through them, and walk out with the one-to-three fulcrums your AI capital should land on — plus the audit trail the board, the regulator, and the shareholder will all accept.
     </p>
     <div class="cta-row">
       <a class="btn-primary" href="#">
