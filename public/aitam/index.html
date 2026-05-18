@@ -305,6 +305,38 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 .audience-strip__items { display: flex; gap: 24px; flex-wrap: wrap; }
 .audience-strip__items span { color: var(--ink); font-weight: 500; }
 
+/* ---------- Signals strip (governance stats) ---------- */
+.signals-strip {
+  padding: 56px 32px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line-soft);
+}
+.signals-strip__inner { max-width: 1100px; margin: 0 auto; }
+.signals-strip__label {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 10.5px; color: var(--ink-3);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0 0 28px;
+}
+.signals-strip__grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px;
+}
+@media (max-width: 760px) { .signals-strip__grid { grid-template-columns: 1fr; gap: 28px; } }
+.signal { display: flex; flex-direction: column; gap: 12px; }
+.signal__figure {
+  font-size: clamp(40px, 5vw, 56px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: var(--fire);
+  line-height: 1;
+}
+.signal__unit { font-size: 0.55em; margin-left: 2px; color: var(--fire); font-weight: 500; }
+.signal__text {
+  font-size: 14.5px; line-height: 1.5; color: var(--ink-2);
+  margin: 0; max-width: 34ch;
+}
+.signal__text em { color: var(--ink); font-style: italic; }
+
 /* ---------- Section common ---------- */
 .section { padding: var(--tw-section-pad, 120px) 32px; }
 .section__inner { max-width: 1100px; margin: 0 auto; }
@@ -988,7 +1020,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
       </h1>
 
       <p class="hero__deck">
-        Every AI portfolio has a long lever. Almost no portfolio has the fulcrum to plant it on. <strong>AiTAM</strong> is a decision system designed to surface the one to three places in your business model where AI must land — and to tell you when it can't find one. Either way, you walk out with the audit trail to defend the bet to a regulator, a board, and a shareholder.
+        Every AI portfolio has a long lever. Almost no portfolio has the fulcrum to plant it on. <strong>AiTAM</strong> is a decision system designed to surface the one to three places in your business model where AI must land — and to tell you when it can't find one. Either way, you walk out with the audit trail to defend the bet to a regulator, a board, and a shareholder. And the personal cover that means you, not your successor, is the one in the room next year.
       </p>
 
       <div class="hero__cta-row">
@@ -1009,8 +1041,8 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
         <span>One ranked list</span>
       </div>
 
-      <div class="equation-card" aria-label="The equation most AI business cases get wrong">
-        <div class="equation-card__label">The equation most AI business cases get wrong</div>
+      <div class="equation-card" aria-label="The equation behind every AI loss">
+        <div class="equation-card__label">The equation behind every AI loss</div>
         <div class="equation">
           <span class="net">Net Value</span>
           <span class="op">=</span>
@@ -1020,7 +1052,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
           <span class="op">+</span>
           <span class="erosion">Stakeholder Value Erosion</span><span class="paren">)</span>
         </div>
-        <p class="equation-card__note">Most decks calculate term one. The board approves term one. The shareholders reckon with all three.</p>
+        <p class="equation-card__note">The deck calculates term one. The board approves term one. The shareholders reckon with all three.</p>
       </div>
     </div>
 
@@ -1093,6 +1125,27 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
   </div>
 </div>
 
+<!-- ===================== SIGNALS / GOVERNANCE STATS ===================== -->
+<section class="signals-strip" aria-label="Why the room is asking">
+  <div class="signals-strip__inner">
+    <p class="signals-strip__label">Why the room is asking</p>
+    <div class="signals-strip__grid">
+      <div class="signal">
+        <div class="signal__figure">66<span class="signal__unit">%</span></div>
+        <p class="signal__text">of boards have <em>“limited to no knowledge or experience”</em> with AI.<sup class="note-ref"><a href="#ref-1">1</a></sup></p>
+      </div>
+      <div class="signal">
+        <div class="signal__figure">13<span class="signal__unit">%</span></div>
+        <p class="signal__text">of S&amp;P 500 companies have a director with AI-related expertise.<sup class="note-ref"><a href="#ref-2">2</a></sup></p>
+      </div>
+      <div class="signal">
+        <div class="signal__figure">36<span class="signal__unit">%</span></div>
+        <p class="signal__text">of companies now disclose AI as a separate 10-K risk factor — up from 14% in 2024.<sup class="note-ref"><a href="#ref-3">3</a></sup></p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ===================== FULCRUM (Archimedes) ===================== -->
 <section class="fulcrum-section" id="fulcrum">
   <div class="fulcrum-section__inner">
@@ -1101,7 +1154,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
       “Give me a lever long enough, a fulcrum on which to place it, and a place to stand, and I shall move the world.”
       <span class="fulcrum-quote__attr">— Archimedes</span>
     </blockquote>
-    <p class="fulcrum-lead">That is the frame. AI is the lever. The leverage point is the fulcrum. Governance and operator credibility are the place to stand. Most enterprise AI programmes have the lever and are missing the other two.</p>
+    <p class="fulcrum-lead">That is the frame. AI is the lever. The leverage point is the fulcrum. Governance and operator credibility are the place to stand. An AI programme with only the lever runs out of conviction, capital or political cover before the bet pays back.</p>
 
     <div class="fulcrum-grid">
       <article class="fulcrum-card">
@@ -1114,7 +1167,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
         </div>
         <div class="fulcrum-card__num">01</div>
         <h3 class="fulcrum-card__title">The lever.</h3>
-        <p class="fulcrum-card__body">Capability, vendors, models, compute, talent. The list of forty use cases. Most companies have plenty.</p>
+        <p class="fulcrum-card__body">Capability, vendors, models, compute, talent. The list of forty use cases. The expensive part of the AI bet is not getting hold of any of this.</p>
       </article>
 
       <article class="fulcrum-card is-fulcrum">
@@ -1126,7 +1179,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
         </div>
         <div class="fulcrum-card__num">02</div>
         <h3 class="fulcrum-card__title">The fulcrum.</h3>
-        <p class="fulcrum-card__body">The one to three places in the business model where a one-percent movement compounds into outsized enterprise value. The <em>economic leverage point</em>. Most companies have never named theirs.</p>
+        <p class="fulcrum-card__body">The one to three places in the business model where a one-percent movement compounds into outsized enterprise value. The <em>economic leverage point</em>. Skip the exercise and the AI spend dissipates across forty initiatives that move nothing.</p>
       </article>
 
       <article class="fulcrum-card">
@@ -1151,9 +1204,9 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
 <section class="section" id="problem">
   <div class="section__inner">
     <div class="section-eyebrow">Why this matters</div>
-    <h2 class="section-title">Most AI business cases would not survive a serious board meeting.</h2>
+    <h2 class="section-title">The AI business case that fails the board does not just fail. It puts the CEO in the next HBR case study.</h2>
     <p class="section-lead">
-      The first wave of enterprise AI is now being judged. MIT's 2025 <em>State of AI in Business</em> study found that 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.<sup class="note-ref"><a href="#ref-1">1</a></sup> The companies whose bets paid off had no special access to better algorithms. They made better trade-offs at the moment of commitment. Three habits explain most of the disappointments.
+      The first wave of enterprise AI is now being judged. MIT's 2025 <em>State of AI in Business</em> study found that 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.<sup class="note-ref"><a href="#ref-4">4</a></sup> The companies whose bets paid off had no special access to better algorithms. They made better trade-offs at the moment of commitment. Three habits explain most of the disappointments.
     </p>
     <p class="problem-fulcrum-note">
       All three habits below are forms of the same failure: <strong>nobody named the fulcrum</strong>. A use-case list is not a thesis. A scorecard is not a strategy. A template is not a leverage point.
@@ -1190,7 +1243,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
     <div class="section-eyebrow">Where AI is different</div>
     <h2 class="section-title">AI breaks the investment playbook in four specific ways.</h2>
     <p class="section-lead">
-      Treating AI like any other capital decision is the most expensive mistake on the table. The economics are different. The risk profile is different. The thing you are actually buying is different. Four differences explain why most spreadsheets get it wrong.
+      Treating AI like any other capital decision is the most expensive mistake on the table. The economics are different. The risk profile is different. The thing you are actually buying is different. Four differences explain why a generic ROI model misreads the bet.
     </p>
 
     <div class="diff-grid">
@@ -1207,7 +1260,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
       <article class="diff-card">
         <div class="diff-card__num">Difference 03</div>
         <h3 class="diff-card__title">Timing matters more than scale.</h3>
-        <p class="diff-card__body">Where network effects or accumulation economics are in play — recommenders, data flywheels, fine-tuned domain models — an eighteen-month lead is often unrecoverable. Where they are not, the lead is more fragile. The investment question is rarely “is this worth doing?” — it is “is this worth doing <em>now</em>, before someone else builds the moat?” Most committees have no language for that question.</p>
+        <p class="diff-card__body">Where network effects or accumulation economics are in play — recommenders, data flywheels, fine-tuned domain models — an eighteen-month lead is often unrecoverable. Where they are not, the lead is more fragile. The investment question is rarely “is this worth doing?” — it is “is this worth doing <em>now</em>, before someone else builds the moat?” Without language for that question, the committee funds the wrong horse, or funds the right one past the recoverable window.</p>
       </article>
       <article class="diff-card">
         <div class="diff-card__num">Difference 04</div>
@@ -1341,7 +1394,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
       <p>Run a candidate initiative through the six lenses and one of two things happens. Either the scores converge — strategy fit is high, criticality is high, readiness is real, risk is named and priced — and you have found a fulcrum. Or the scores scatter, and what you have is a lever with nothing underneath it.</p>
     </div>
     <blockquote class="leverage-pullquote">
-      Concentration is the strategy. Most companies should leave a workshop with <em>one to three named fulcrums</em>, not forty ranked use cases.
+      Focus is the strategy. <em>One to three named fulcrums</em> beats a list of forty ranked use cases — because capital you spread thin is capital that returns nothing.
     </blockquote>
   </div>
 </section>
@@ -1389,7 +1442,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
           <div class="asym-row__num">03</div>
           <div class="asym-row__body">
             <h3 class="asym-row__title">Procurement is fast. <em>Adoption is slow.</em></h3>
-            <p class="asym-row__desc">The licence is signed in a quarter. The behaviour change takes three years. Most of the gap is where the business case quietly dies.</p>
+            <p class="asym-row__desc">The licence is signed in a quarter. The behaviour change takes three years. The gap is where the business case quietly dies.</p>
           </div>
         </div>
         <div class="asym-row__force">
@@ -1600,7 +1653,7 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
       <article class="metric-card is-mid">
         <div class="metric-card__threshold">20–60%</div>
         <h3 class="metric-card__title">In motion.</h3>
-        <p class="metric-card__body">The band most companies are in. The question is whether you are migrating up or sliding down. Re-score quarterly.</p>
+        <p class="metric-card__body">The default position. A step change moves you up. Drift keeps you here. Without either, you slide back to sprinkler. Re-score quarterly.</p>
       </article>
       <article class="metric-card is-good">
         <div class="metric-card__threshold">Above 60%</div>
@@ -1645,7 +1698,10 @@ a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
   <div class="notes-section__inner">
     <p class="notes-section__label">Notes</p>
     <ol class="notes-list">
-      <li id="ref-1">MIT, <em>State of AI in Business 2025</em> — finding cited: 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.</li>
+      <li id="ref-1">Deloitte, <em>Governance of AI</em>, survey of 695 directors across 56 countries; McKinsey's director survey reached the same 66% finding.</li>
+      <li id="ref-2">ISS-Corporate analysis of SEC filings, reported by Axios, April 2026.</li>
+      <li id="ref-3">Harvard Law School Forum on Corporate Governance, October 2025.</li>
+      <li id="ref-4">MIT, <em>State of AI in Business 2025</em> — finding cited: 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.</li>
     </ol>
   </div>
 </section>
