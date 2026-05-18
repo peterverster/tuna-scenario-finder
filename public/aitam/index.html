@@ -838,7 +838,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 .metric-hero em { color: var(--fire); font-style: normal; }
 
 .metric-cards {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
   margin-bottom: 56px;
 }
 @media (max-width: 760px) { .metric-cards { grid-template-columns: 1fr; } }
@@ -849,6 +849,8 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
   border-radius: 10px;
 }
 .metric-card.is-bad { border-color: rgba(255, 255, 255, 0.1); }
+.metric-card.is-mid { border-color: rgba(255, 255, 255, 0.18); }
+.metric-card.is-mid .metric-card__threshold { color: var(--ink-4); }
 .metric-card.is-good { border-color: rgba(255, 58, 5, 0.35); }
 .metric-card__threshold {
   font-family: 'Noto Sans Mono', monospace;
@@ -917,6 +919,39 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 }
 .footer a:hover { color: var(--ink); }
 .footer__nav { display: flex; gap: 24px; }
+
+/* ---------- Notes / sources ---------- */
+.notes-section {
+  padding: 48px 32px 24px;
+  background: var(--paper);
+  border-top: 1px solid var(--line-soft);
+}
+.notes-section__inner { max-width: 1100px; margin: 0 auto; }
+.notes-section__label {
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 10.5px; color: var(--ink-3);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 0 0 14px;
+}
+.notes-list {
+  list-style: decimal; padding-left: 22px; margin: 0;
+  font-family: 'Noto Sans Mono', monospace;
+  font-size: 11.5px; color: var(--ink-3);
+  line-height: 1.65; letter-spacing: 0.01em;
+}
+.notes-list li { margin-bottom: 8px; }
+.notes-list li:target { color: var(--ink); }
+.notes-list em { color: var(--ink-2); font-style: italic; }
+sup.note-ref { line-height: 0; font-size: 0.7em; margin-left: 1px; }
+sup.note-ref a { color: var(--fire); font-weight: 500; }
+sup.note-ref a:hover { text-decoration: underline; }
+
+a.inline-link {
+  color: var(--ink);
+  border-bottom: 1px solid var(--fire);
+  transition: color .15s ease, background .15s ease;
+}
+a.inline-link:hover { background: rgba(255, 58, 5, 0.08); }
 </style>
 </head>
 <body>
@@ -953,7 +988,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       </h1>
 
       <p class="hero__deck">
-        Every AI portfolio has a long lever. Almost none of them have a fulcrum. <strong>AiTAM</strong> is the decision system that names the one to three places in your business model where AI must land — and gives you the audit trail to defend the bet to a regulator, a board, and a shareholder.
+        Every AI portfolio has a long lever. Almost no portfolio has the fulcrum to plant it on. <strong>AiTAM</strong> is a decision system designed to surface the one to three places in your business model where AI must land — and to tell you when it can't find one. Either way, you walk out with the audit trail to defend the bet to a regulator, a board, and a shareholder.
       </p>
 
       <div class="hero__cta-row">
@@ -1038,7 +1073,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 
       <div class="hv__caption">
         <span>The risk lens carries the most weight — by design</span>
-        <span class="hv__seed">reference profile</span>
+        <span class="hv__seed">default · tune in an afternoon</span>
       </div>
     </aside>
   </div>
@@ -1066,7 +1101,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       “Give me a lever long enough, a fulcrum on which to place it, and a place to stand, and I shall move the world.”
       <span class="fulcrum-quote__attr">— Archimedes</span>
     </blockquote>
-    <p class="fulcrum-lead">Most enterprise AI programmes have the lever. They are missing the other two.</p>
+    <p class="fulcrum-lead">That is the frame. AI is the lever. The leverage point is the fulcrum. Governance and operator credibility are the place to stand. Most enterprise AI programmes have the lever and are missing the other two.</p>
 
     <div class="fulcrum-grid">
       <article class="fulcrum-card">
@@ -1118,7 +1153,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     <div class="section-eyebrow">Why this matters</div>
     <h2 class="section-title">Most AI business cases would not survive a serious board meeting.</h2>
     <p class="section-lead">
-      The first wave of enterprise AI is now being judged. The companies whose bets paid off had no special access to better algorithms. They made better tradeoffs at the moment of commitment. Three habits explain most of the disappointments.
+      The first wave of enterprise AI is now being judged. MIT's 2025 <em>State of AI in Business</em> study found that 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.<sup class="note-ref"><a href="#ref-1">1</a></sup> The companies whose bets paid off had no special access to better algorithms. They made better trade-offs at the moment of commitment. Three habits explain most of the disappointments.
     </p>
     <p class="problem-fulcrum-note">
       All three habits below are forms of the same failure: <strong>nobody named the fulcrum</strong>. A use-case list is not a thesis. A scorecard is not a strategy. A template is not a leverage point.
@@ -1128,7 +1163,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       <article class="problem-card" style="--accent: var(--sig-erosion);">
         <div class="problem-card__num">Habit 01</div>
         <h3 class="problem-card__title">Counting the upside, ignoring the bill.</h3>
-        <p class="problem-card__body">A glossy ROI number wins the room. The change-management, the data work, the regulatory exposure and the reputational risk all arrive later — and quietly cancel the gain.</p>
+        <p class="problem-card__body">A glossy ROI number wins the room. The change effort, the data work, the regulatory exposure and the reputational risk all arrive later — and quietly cancel the gain.</p>
         <div class="problem-card__tag">Upside bias</div>
       </article>
 
@@ -1172,7 +1207,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       <article class="diff-card">
         <div class="diff-card__num">Difference 03</div>
         <h3 class="diff-card__title">Timing matters more than scale.</h3>
-        <p class="diff-card__body">Network effects and accumulation economics mean an eighteen-month lead is often unrecoverable. The investment question is rarely “is this worth doing?” — it is “is this worth doing <em>now</em>, before someone else builds the moat?” Most committees have no language for that question.</p>
+        <p class="diff-card__body">Where network effects or accumulation economics are in play — recommenders, data flywheels, fine-tuned domain models — an eighteen-month lead is often unrecoverable. Where they are not, the lead is more fragile. The investment question is rarely “is this worth doing?” — it is “is this worth doing <em>now</em>, before someone else builds the moat?” Most committees have no language for that question.</p>
       </article>
       <article class="diff-card">
         <div class="diff-card__num">Difference 04</div>
@@ -1195,9 +1230,9 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
 <section class="section framework-section" id="framework">
   <div class="section__inner">
     <div class="section-eyebrow">Six lenses to find the fulcrum</div>
-    <h2 class="section-title">Look at every AI bet through the six things that decide whether it is a fulcrum or a lever moving nothing.</h2>
+    <h2 class="section-title">Look at every AI bet through the six lenses that decide whether it is a fulcrum or a lever moving nothing.</h2>
     <p class="section-lead">
-      The six lenses are not a scoring exercise. They are a search procedure. Run an initiative through all six and what comes out the other side is the answer to one question: <em>is this a fulcrum, or is this a lever moving nothing?</em> Score each initiative from zero to five through each lens. Risk is scored as a negative. The reference weights below come from years of AI engagements; tune them to your own appetite in an afternoon.
+      The six lenses are not a scoring exercise. They are a search procedure. Run an initiative through all six and what comes out the other side is the answer to one question: <em>is this a fulcrum, or is this a lever moving nothing?</em> Score each initiative from zero to five through each lens. Risk is scored as a negative — and weighted highest, because <a class="inline-link" href="#asymmetries">the asymmetries below</a> make under-weighting it the most expensive mistake on the page. Tune the reference weights to your own appetite in an afternoon.
     </p>
 
     <div class="dim-grid">
@@ -1221,7 +1256,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
           <div class="dim-card__weight">w 0.18</div>
         </div>
         <h3 class="dim-card__title">Who benefits, and by how much?</h3>
-        <p class="dim-card__desc">Customers, employees, regulators, owners — nine groups whose verdicts add up to whether the project lives or dies.</p>
+        <p class="dim-card__desc">Customers, employees, regulators, owners — four of the nine groups whose verdicts add up to whether the project lives or dies.</p>
         <div class="dim-card__crits">
           <div class="dim-crit">Customers · 0.18</div>
           <div class="dim-crit">Regulators · 0.17</div>
@@ -1301,7 +1336,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     <div class="section-eyebrow">The output</div>
     <h2 class="section-title">What the six lenses are looking for.</h2>
     <div class="leverage-body">
-      <p>Every business model has one to three places where, if AI moves the needle, the enterprise revalues. Freeport-McMoRan found theirs in concentrator yield. Toyota found theirs in supply-chain integration. Neither company deployed AI across the enterprise. They deployed it against the leverage point.</p>
+      <p>Every business model has one to three places where, if AI lands hardest, the enterprise revalues. Freeport-McMoRan found theirs in concentrator yield. Toyota found theirs in supply-chain integration. Neither company deployed AI across the enterprise. They deployed it against the leverage point. GE Predix found a fulcrum in industrial-asset analytics and could not execute against it — which is why the third element of the frame, the place to stand, is in the framework.</p>
       <p>The leverage point is the <strong>fulcrum</strong>. The six lenses are the instruments that locate it.</p>
       <p>Run a candidate initiative through the six lenses and one of two things happens. Either the scores converge — strategy fit is high, criticality is high, readiness is real, risk is named and priced — and you have found a fulcrum. Or the scores scatter, and what you have is a lever with nothing underneath it.</p>
     </div>
@@ -1359,7 +1394,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
         </div>
         <div class="asym-row__force">
           <div class="asym-row__force-label">What it forces</div>
-          <div class="asym-row__force-text">Budget the people-change at the same line as the licence.</div>
+          <div class="asym-row__force-text">Budget the behavioural change at the same line as the licence.</div>
         </div>
       </article>
 
@@ -1417,7 +1452,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
       <div class="dss-step">
         <div class="dss-step__num">Step 02</div>
         <h3 class="dss-step__title">Calibrate the lenses</h3>
-        <p class="dss-step__desc">Compare the lenses two at a time. The arithmetic turns those judgements into a defensible weighting your CFO will accept.</p>
+        <p class="dss-step__desc">Compare the lenses in pairs — risk against returns, strategy against readiness — and let the arithmetic turn those judgements into a defensible weighting your CFO will accept.</p>
         <div class="dss-step__hint">a workshop</div>
       </div>
       <div class="dss-step">
@@ -1541,7 +1576,7 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
     </div>
 
     <p class="output-closer">
-      <strong>Three of the five projects are levers. One is the fulcrum.</strong> That is a normal distribution, not a failure of imagination.
+      <strong>Three of the five projects are levers. One is the fulcrum.</strong> That is the normal shape, not a failure of imagination.
     </p>
   </div>
 </section>
@@ -1561,6 +1596,11 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
         <div class="metric-card__threshold">Below 20%</div>
         <h3 class="metric-card__title">Sprinkler.</h3>
         <p class="metric-card__body">Your AI strategy is a sprinkler. Activity without revaluation. Budget without thesis.</p>
+      </article>
+      <article class="metric-card is-mid">
+        <div class="metric-card__threshold">20–60%</div>
+        <h3 class="metric-card__title">In motion.</h3>
+        <p class="metric-card__body">The band most companies are in. The question is whether you are migrating up or sliding down. Re-score quarterly.</p>
       </article>
       <article class="metric-card is-good">
         <div class="metric-card__threshold">Above 60%</div>
@@ -1597,6 +1637,16 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; }
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
       </a>
     </div>
+  </div>
+</section>
+
+<!-- ===================== NOTES / SOURCES ===================== -->
+<section class="notes-section" aria-label="Notes and sources">
+  <div class="notes-section__inner">
+    <p class="notes-section__label">Notes</p>
+    <ol class="notes-list">
+      <li id="ref-1">MIT, <em>State of AI in Business 2025</em> — finding cited: 95% of generative-AI pilots failed to deliver measurable P&amp;L impact.</li>
+    </ol>
   </div>
 </section>
 
